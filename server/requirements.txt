@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+pydantic
+pydantic-settings
+python-dotenv
+alembic
+passlib[argon2]
+argon2-cffi
+PyJWT[crypto]

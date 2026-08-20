@@ -1,0 +1,133 @@
+@import "tailwindcss";
+@config "../../tailwind.config.cjs";
+
+@theme {
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 976px;
+  --breakpoint-xl: 1440px;
+
+  --font-sans: var(--font-poppins), sans-serif;
+
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* Gray */
+  --color-gray-50: #f8fafc;
+  --color-gray-100: #f1f5f9;
+  --color-gray-200: #e2e8f0;
+  --color-gray-300: #cbd5e1;
+  --color-gray-400: #94a3b8;
+  --color-gray-500: #64748b;
+  --color-gray-600: #475569;
+  --color-gray-700: #334155;
+  --color-gray-800: #1e293b;
+  --color-gray-900: #0f172a;
+
+  /* Primary */
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-500: #0058be;
+  --color-primary-600: #2170e4;
+  --color-primary-900: #001e2c;
+
+  /* Secondary */
+  --color-secondary-300: #7bd0ff;
+  --color-secondary-500: #38bdf8;
+  --color-secondary-900: #004c69;
+
+  /* Success */
+  --color-green-500: #10b981;
+  --color-green-600: #059669;
+
+  /* Warning */
+  --color-yellow-500: #f59e0b;
+  --color-yellow-600: #d97706;
+
+  /* Danger */
+  --color-red-100: #ffdad6;
+  --color-red-500: #ef4444;
+  --color-red-700: #ba1a1a;
+  --color-red-900: #93000a;
+
+  /* Accent */
+  --color-orange-100: #ffdcc6;
+  --color-orange-200: #ffb786;
+  --color-orange-500: #924700;
+  --color-orange-600: #b75b00;
+  --color-orange-900: #311400;
+
+  /* Surfaces */
+  --color-surface: #ffffff;
+  --color-surface-canvas: #f8fafc;
+  --color-surface-subtle: #f1f5f9;
+  --color-surface-muted: #e2e8f0;
+  --color-surface-elevated: #ffffff;
+  --color-surface-inverse: #1e293b;
+
+  /* Text */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-text-inverse: #ffffff;
+
+  /* Borders */
+  --color-border: #cbd5e1;
+  --color-border-subtle: #e2e8f0;
+  --color-outline: #64748b;
+
+  /* Primary */
+  --color-primary: #0058be;
+  --color-primary-hover: #2170e4;
+  --color-primary-subtle: #dbeafe;
+  --color-primary-subtle-alt: #bfdbfe;
+  --color-primary-dark: #001e2c;
+
+  /* Secondary */
+  --color-secondary: #38bdf8;
+  --color-secondary-hover: #7bd0ff;
+  --color-secondary-dark: #004c69;
+
+  /* Links */
+  --color-link: #0058be;
+  --color-link-hover: #2170e4;
+
+  /* Status */
+  --color-success: #10b981;
+  --color-success-hover: #059669;
+  --color-success-container: #d1fae5;
+
+  --color-warning: #f59e0b;
+  --color-warning-hover: #d97706;
+
+  --color-danger: #ef4444;
+
+  --color-critical: #ba1a1a;
+  --color-critical-dark: #93000a;
+  --color-critical-container: #ffdad6;
+
+  /* Accent */
+  --color-accent: #924700;
+  --color-accent-hover: #b75b00;
+  --color-accent-container: #ffdcc6;
+  --color-accent-container-alt: #ffb786;
+  --color-accent-text: #311400;
+
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  background: var(--color-background);
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-poppins), sans-serif;
+}

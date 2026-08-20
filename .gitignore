@@ -1,0 +1,82 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+
+# Secrets — keep example env files
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Logs
+logs/
+*.log
+
+# Local / temporary
+tmp/
+temp/
+.tmp/
+.temp/
+.cache/
+
+# Next.js (client)
+client/node_modules/
+client/.next/
+client/out/
+client/build/
+client/dist/
+client/coverage/
+client/.turbo/
+client/.vercel/
+client/*.tsbuildinfo
+
+# FastAPI / Python (server)
+server/venv/
+server/.venv/
+server/env/
+server/ENV/
+server/**/__pycache__/
+server/**/*.py[cod]
+server/.pytest_cache/
+server/.mypy_cache/
+server/.ruff_cache/
+server/.coverage
+server/htmlcov/
+server/*.egg-info/
+server/dist/
+server/build/
+
+# Local databases and dumps
+*.db
+*.sqlite
+*.sqlite3
+*.sql.gz
+
+# Dataset files (keep the data/ directory)
+data/*
+!data/.gitkeep
+*.csv
+*.xlsx
+*.parquet
+
+# Python bytecode at repo root
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node at repo root
+node_modules/
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
