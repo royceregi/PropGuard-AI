@@ -47,10 +47,12 @@ def get_current_user(
 
 
 def require_roles(roles: Sequence[str]):
+    """Authorize by access_level (legacy name kept for existing endpoint imports)."""
     allowed = {role.upper() for role in roles}
 
     def _dependency(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role not in allowed:
+        level = (current_user.access_level or "").strip().upper()
+        if level not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to access this resource",
@@ -58,3 +60,7 @@ def require_roles(roles: Sequence[str]):
         return current_user
 
     return _dependency
+
+
+def require_access_levels(levels: Sequence[str]):
+    return require_roles(levels)

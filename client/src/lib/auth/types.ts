@@ -1,22 +1,36 @@
-export const USER_ROLES = [
-  "SUPER_ADMIN",
-  "LAND_REGISTRY",
-  "REAL_ESTATE_COMPANY",
-  "PUBLIC_USER",
+export const ACCESS_LEVELS = [
+  "SYSTEM",
+  "REGISTRY",
+  "COMPANY",
+  "PUBLIC",
+  "STANDARD",
+  "ELEVATED",
 ] as const;
 
-export type UserRole = (typeof USER_ROLES)[number];
+export type AccessLevel = (typeof ACCESS_LEVELS)[number];
+
+/** Operational levels that may sign in (must also be is_active). */
+export const OPERATIONAL_ACCESS_LEVELS = [
+  "SYSTEM",
+  "REGISTRY",
+  "COMPANY",
+  "PUBLIC",
+] as const;
+
+export type OperationalAccessLevel = (typeof OPERATIONAL_ACCESS_LEVELS)[number];
+
+/** @deprecated Use AccessLevel — kept as alias during migration. */
+export type UserRole = AccessLevel;
 
 export interface AuthUser {
   user_id: string;
   full_name: string | null;
-  nic: string;
-  role: UserRole;
+  email: string | null;
+  access_level: AccessLevel;
   wallet_address: string | null;
   username?: string | null;
-  email?: string | null;
+  nic_hash?: string | null;
   kyc_status?: string | null;
-  access_level?: string | null;
   mfa_enabled?: boolean;
   is_active?: boolean;
   last_login?: string | null;
@@ -29,8 +43,21 @@ export interface LoginResponse {
   user: AuthUser;
 }
 
+export function isAccessLevel(
+  value: string | undefined | null,
+): value is AccessLevel {
+  return ACCESS_LEVELS.includes(value as AccessLevel);
+}
+
+export function isOperationalAccessLevel(
+  value: string | undefined | null,
+): value is OperationalAccessLevel {
+  return OPERATIONAL_ACCESS_LEVELS.includes(value as OperationalAccessLevel);
+}
+
+/** @deprecated Use isAccessLevel / isOperationalAccessLevel. */
 export function isUserRole(
   value: string | undefined | null,
-): value is UserRole {
-  return USER_ROLES.includes(value as UserRole);
+): value is AccessLevel {
+  return isOperationalAccessLevel(value) || isAccessLevel(value);
 }

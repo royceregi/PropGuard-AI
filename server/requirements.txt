@@ -4,6 +4,7 @@ sqlalchemy
 psycopg2-binary
 pydantic
 pydantic-settings
+email-validator
 python-dotenv
 alembic
 passlib[argon2]

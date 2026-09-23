@@ -13,6 +13,16 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     AUTH_COOKIE_NAME: str = "propguard_access_token"
 
+    # AI / LLM (Report Agent, NL search — fill in .env; unused until agents are wired)
+    AI_ENABLED: bool = False
+    AI_PROVIDER: str = "gemini"  # gemini | openai | ollama
+    AI_API_KEY: str = ""
+    AI_MODEL: str = "gemini-2.0-flash"
+    AI_BASE_URL: str = ""  # optional; e.g. OpenAI-compatible or Ollama URL
+    AI_TEMPERATURE: float = 0.2
+    AI_MAX_TOKENS: int = 2048
+    AI_TIMEOUT_SECONDS: int = 60
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

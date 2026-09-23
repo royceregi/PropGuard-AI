@@ -1,4 +1,4 @@
-"""Re-hash and upsert the four local demo login accounts."""
+"""Re-hash and upsert the four local demo login accounts (access_level auth)."""
 
 from __future__ import annotations
 
@@ -12,8 +12,9 @@ if str(ROOT) not in sys.path:
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.core.security import hash_password, normalize_nic
-from app.models.user import User, UserRole
+from app.core.roles import AccessLevel
+from app.core.security import hash_nic, hash_password
+from app.models.user import User
 
 DEMO_USERS = (
     {
@@ -24,10 +25,9 @@ DEMO_USERS = (
         "phone_number": "+971-50-000-0001",
         "password": "DemoAdmin#2026",
         "nic": "900000001V",
-        "role": UserRole.SUPER_ADMIN.value,
         "wallet_address": "0xDEMO000000000000000000000000000000000001",
         "kyc_status": "VERIFIED",
-        "access_level": "SYSTEM",
+        "access_level": AccessLevel.SYSTEM.value,
     },
     {
         "user_id": "SYS000002",
@@ -37,10 +37,9 @@ DEMO_USERS = (
         "phone_number": "+971-50-000-0002",
         "password": "DemoRegistry#2026",
         "nic": "900000002V",
-        "role": UserRole.LAND_REGISTRY.value,
         "wallet_address": "0xDEMO000000000000000000000000000000000002",
         "kyc_status": "VERIFIED",
-        "access_level": "REGISTRY",
+        "access_level": AccessLevel.REGISTRY.value,
     },
     {
         "user_id": "SYS000003",
@@ -50,10 +49,9 @@ DEMO_USERS = (
         "phone_number": "+971-50-000-0003",
         "password": "DemoCompany#2026",
         "nic": "900000003V",
-        "role": UserRole.REAL_ESTATE_COMPANY.value,
         "wallet_address": "0xDEMO000000000000000000000000000000000003",
         "kyc_status": "VERIFIED",
-        "access_level": "COMPANY",
+        "access_level": AccessLevel.COMPANY.value,
     },
     {
         "user_id": "SYS000004",
@@ -63,10 +61,9 @@ DEMO_USERS = (
         "phone_number": "+971-50-000-0004",
         "password": "DemoPublic#2026",
         "nic": "900000004V",
-        "role": UserRole.PUBLIC_USER.value,
         "wallet_address": "0xDEMO000000000000000000000000000000000004",
         "kyc_status": "VERIFIED",
-        "access_level": "PUBLIC",
+        "access_level": AccessLevel.PUBLIC.value,
     },
 )
 
@@ -74,9 +71,15 @@ DEMO_USERS = (
 def upsert_demo_users(db: Session) -> None:
     for row in DEMO_USERS:
         password = row["password"]
-        payload = {key: value for key, value in row.items() if key != "password"}
-        payload["nic"] = normalize_nic(payload["nic"])
-        payload["password_hash"] = hash_password(password)
+        nic = row["nic"]
+        payload = {
+            key: value
+            for key, value in row.items()
+            if key not in {"password", "nic"}
+        }
+        payload["email"] = str(payload["email"]).strip().lower()
+        payload["nic_hash"] = hash_nic(str(nic))
+        payload["password_hash"] = hash_password(str(password))
         payload["mfa_enabled"] = False
         payload["is_active"] = True
 
@@ -93,6 +96,6 @@ if __name__ == "__main__":
     session = SessionLocal()
     try:
         upsert_demo_users(session)
-        print("Demo users upserted with freshly hashed passwords.")
+        print("Demo users upserted (access_level auth + Argon2 passwords).")
     finally:
         session.close()

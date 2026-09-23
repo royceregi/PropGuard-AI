@@ -16,8 +16,8 @@ export function SideNav({
   onClose: () => void;
 }) {
   const pathname = usePathname();
-  const role = useAuthStore((state) => state.user?.role);
-  const navItems = visibleNavItems(role);
+  const accessLevel = useAuthStore((state) => state.user?.access_level);
+  const navItems = visibleNavItems(accessLevel);
   const settingsItem = navItems.find((item) => item.id === "settings");
   const isSettingsActive =
     pathname === "/settings" || pathname.startsWith("/settings/");
@@ -42,10 +42,10 @@ export function SideNav({
             <Icons.AccountBalance className="h-7 w-7 text-[28px]" />
           </div>
           <div className={`min-w-0 ${collapsed ? "md:hidden" : ""}`}>
-            <h2 className="text-[15px] font-bold leading-tight tracking-wide text-text-inverse">
+            <h2 className="text-[15px] font-bold leading-tight tracking-wide text-white">
               PropGuard AI
             </h2>
-            <p className="mt-0.5 text-[10px] font-semibold tracking-[0.12em] text-text-muted uppercase">
+            <p className="mt-0.5 text-[10px] font-semibold tracking-[0.12em] text-gray-400 uppercase">
               Blockchain + Multi-Agent AI
             </p>
           </div>
@@ -54,7 +54,7 @@ export function SideNav({
           type="button"
           aria-label="Close navigation"
           onClick={onClose}
-          className="ml-auto rounded-md p-1 text-text-muted hover:bg-surface-inverse hover:text-text-inverse md:hidden"
+          className="ml-auto rounded-md p-1 text-gray-400 hover:bg-white/10 hover:text-white md:hidden"
         >
           <Icons.Close className="h-5 w-5 text-[20px]" />
         </button>
@@ -90,8 +90,8 @@ export function SideNav({
                     : "w-full gap-3 rounded-lg px-3.5 py-2.5"
                 } ${
                   isActive
-                    ? "bg-surface-inverse text-text-inverse"
-                    : "text-text-muted hover:bg-surface-inverse/60 hover:text-text-inverse"
+                    ? "bg-white/10 text-white"
+                    : "text-gray-400 hover:bg-white/5 hover:text-white"
                 }`}
               >
                 {isActive ? (
@@ -119,7 +119,7 @@ export function SideNav({
           collapsed ? "md:items-center md:px-0" : "md:px-3"
         }`}
       >
-        <div className="mb-4 h-px w-full bg-surface-inverse" />
+        <div className="mb-4 h-px w-full bg-white/10" />
 
         {settingsItem ? (
           <Link
@@ -132,8 +132,8 @@ export function SideNav({
                 : "w-full gap-3 rounded-lg px-3.5 py-2.5"
             } ${
               isSettingsActive
-                ? "bg-surface-inverse text-text-inverse"
-                : "text-text-muted hover:bg-surface-inverse/60 hover:text-text-inverse"
+                ? "bg-white/10 text-white"
+                : "text-gray-400 hover:bg-white/5 hover:text-white"
             }`}
           >
             {isSettingsActive ? (

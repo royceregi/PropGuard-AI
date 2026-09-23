@@ -1,11 +1,12 @@
 "use client";
 
 import { useAuthStore } from "@/lib/auth/store";
-import { homeForRole } from "@/lib/auth/roles";
+import { homeForAccessLevel } from "@/lib/auth/roles";
 import type { AuthUser, LoginResponse } from "@/lib/auth/types";
+import { isOperationalAccessLevel } from "@/lib/auth/types";
 
 interface LoginPayload {
-  nic: string;
+  email: string;
   password: string;
 }
 
@@ -30,7 +31,7 @@ export function useAuth() {
       const detail =
         data && "detail" in data && typeof data.detail === "string"
           ? data.detail
-          : "Invalid NIC or password";
+          : "Invalid email or password";
       throw new Error(detail);
     }
 
@@ -53,6 +54,9 @@ export function useAuth() {
     isAuthenticated: Boolean(user),
     login,
     logout,
-    homePath: user ? homeForRole(user.role) : "/login",
+    homePath:
+      user && isOperationalAccessLevel(user.access_level)
+        ? homeForAccessLevel(user.access_level)
+        : "/login",
   };
 }

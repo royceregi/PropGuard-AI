@@ -1,11 +1,12 @@
--- PropGuard AI — demo login accounts (one per role).
--- Passwords are Argon2id hashes generated locally. Raw dataset hashes are not reused.
+-- PropGuard AI — demo login accounts (one per access level).
+-- Login is email + password. Auth identity is access_level (not role).
+-- Prefer: python scripts/seed_demo_users.py (fresh Argon2 hashes).
 --
 -- Local demo passwords (never used as production credentials):
---   SUPER_ADMIN         NIC 900000001V   password DemoAdmin#2026
---   LAND_REGISTRY       NIC 900000002V   password DemoRegistry#2026
---   REAL_ESTATE_COMPANY NIC 900000003V   password DemoCompany#2026
---   PUBLIC_USER         NIC 900000004V   password DemoPublic#2026
+--   SYSTEM   maria.s@example.com     DemoAdmin#2026
+--   REGISTRY ivan.p@example.net       DemoRegistry#2026
+--   COMPANY  george.a@example.org     DemoCompany#2026
+--   PUBLIC   bob.m@example.net         DemoPublic#2026
 
 INSERT INTO core.users (
     user_id,
@@ -14,9 +15,8 @@ INSERT INTO core.users (
     email,
     phone_number,
     password_hash,
-    nic,
-    role,
     wallet_address,
+    nic_hash,
     kyc_status,
     access_level,
     mfa_enabled,
@@ -30,9 +30,8 @@ INSERT INTO core.users (
         'maria.s@example.com',
         '+971-50-000-0001',
         '$argon2id$v=19$m=65536,t=3,p=4$dy5FiHEOYey9F4JwDmFsrQ$dQfKku1LDJ2ETEqNJSHjP2SoBBQtRw7SSNiACkfTrSI',
-        '900000001V',
-        'SUPER_ADMIN',
         '0xDEMO000000000000000000000000000000000001',
+        '7098fe0f09940dbb61025931572461af221b2aa047c1b9f94ef27677758a74b5',
         'VERIFIED',
         'SYSTEM',
         FALSE,
@@ -46,9 +45,8 @@ INSERT INTO core.users (
         'ivan.p@example.net',
         '+971-50-000-0002',
         '$argon2id$v=19$m=65536,t=3,p=4$UmrtvVcqpbRWCuEc41wrRQ$td7fknyQ9ymm4I+XqCG0MhLwiby6ZQczGkdUGBET40M',
-        '900000002V',
-        'LAND_REGISTRY',
         '0xDEMO000000000000000000000000000000000002',
+        'ee45bc504c49d20d54df2538de62e4604c32d41d8480a206d49e5665bf166a81',
         'VERIFIED',
         'REGISTRY',
         FALSE,
@@ -62,9 +60,8 @@ INSERT INTO core.users (
         'george.a@example.org',
         '+971-50-000-0003',
         '$argon2id$v=19$m=65536,t=3,p=4$HWPs/b93DsGYU8qZM2aMMQ$gtp8BCaOdufTYRjfYUX3f4ogvu9wL8YahckXfGU+8II',
-        '900000003V',
-        'REAL_ESTATE_COMPANY',
         '0xDEMO000000000000000000000000000000000003',
+        '4afc2976171c63d55916fa7c1ca1d03688981af15b3375a4c6c1b099cd58d922',
         'VERIFIED',
         'COMPANY',
         FALSE,
@@ -78,9 +75,8 @@ INSERT INTO core.users (
         'bob.m@example.net',
         '+971-50-000-0004',
         '$argon2id$v=19$m=65536,t=3,p=4$JSREqLV27j0npFSqtRbCeA$Th8itsaW4ie2LagHpEoILKx10K9I8D7HXH7EhbOPdV8',
-        '900000004V',
-        'PUBLIC_USER',
         '0xDEMO000000000000000000000000000000000004',
+        'd7a034981328c0879df6124d9d3697ae995fa89c27d5f5db2d0fa3c6d0963dcd',
         'VERIFIED',
         'PUBLIC',
         FALSE,
@@ -93,21 +89,9 @@ ON CONFLICT (user_id) DO UPDATE SET
     email = EXCLUDED.email,
     phone_number = EXCLUDED.phone_number,
     password_hash = EXCLUDED.password_hash,
-    nic = EXCLUDED.nic,
-    role = EXCLUDED.role,
     wallet_address = EXCLUDED.wallet_address,
+    nic_hash = EXCLUDED.nic_hash,
     kyc_status = EXCLUDED.kyc_status,
     access_level = EXCLUDED.access_level,
     mfa_enabled = EXCLUDED.mfa_enabled,
-    is_active = TRUE;
-
--- Enforce login-required columns after demo rows exist.
-ALTER TABLE core.users
-    ALTER COLUMN nic SET NOT NULL,
-    ALTER COLUMN password_hash SET NOT NULL,
-    ALTER COLUMN role SET NOT NULL;
-
-ALTER TABLE core.users
-    ALTER COLUMN mfa_enabled SET DEFAULT FALSE,
-    ALTER COLUMN is_active SET DEFAULT TRUE,
-    ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;
+    is_active = EXCLUDED.is_active;

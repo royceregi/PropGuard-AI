@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/lib/auth/store";
 import { isAuthPage } from "@/lib/auth/roles";
 import type { AuthUser } from "@/lib/auth/types";
-import { isUserRole } from "@/lib/auth/types";
+import { isOperationalAccessLevel } from "@/lib/auth/types";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         const data = (await response.json()) as AuthUser;
-        if (!cancelled && isUserRole(data.role)) {
+        if (!cancelled && isOperationalAccessLevel(data.access_level)) {
           setSession(data, token);
         }
       } catch {

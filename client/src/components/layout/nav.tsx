@@ -1,5 +1,6 @@
-import { homeForRole } from "@/lib/auth/roles";
-import type { UserRole } from "@/lib/auth/types";
+import type { AccessLevel } from "@/lib/auth/types";
+import { homeForAccessLevel } from "@/lib/auth/roles";
+import { isOperationalAccessLevel } from "@/lib/auth/types";
 
 export type NavItemId =
   | "dashboard"
@@ -18,7 +19,7 @@ export interface NavItem {
   href: string;
   label: string;
   badge: string | null;
-  roles?: UserRole[];
+  levels?: AccessLevel[];
 }
 
 export const navItems: NavItem[] = [
@@ -33,7 +34,7 @@ export const navItems: NavItem[] = [
     href: "/property-search",
     label: "Property Search",
     badge: null,
-    roles: ["SUPER_ADMIN", "LAND_REGISTRY", "REAL_ESTATE_COMPANY"],
+    levels: ["SYSTEM", "REGISTRY", "COMPANY"],
   },
   {
     id: "transactions",
@@ -52,14 +53,14 @@ export const navItems: NavItem[] = [
     href: "/ai-investigation",
     label: "AI Investigation",
     badge: null,
-    roles: ["SUPER_ADMIN", "LAND_REGISTRY", "REAL_ESTATE_COMPANY"],
+    levels: ["SYSTEM", "REGISTRY", "COMPANY"],
   },
   {
     id: "risk_analysis",
     href: "/risk-analysis",
     label: "Risk Analysis",
     badge: null,
-    roles: ["SUPER_ADMIN", "LAND_REGISTRY", "REAL_ESTATE_COMPANY"],
+    levels: ["SYSTEM", "REGISTRY", "COMPANY"],
   },
   {
     id: "investigation_reports",
@@ -72,34 +73,39 @@ export const navItems: NavItem[] = [
     href: "/audit-trail",
     label: "Audit Trail",
     badge: null,
-    roles: ["SUPER_ADMIN", "LAND_REGISTRY"],
+    levels: ["SYSTEM", "REGISTRY"],
   },
   {
     id: "users",
     href: "/users",
-    label: "Users",
+    label: "User Management",
     badge: null,
-    roles: ["SUPER_ADMIN"],
+    levels: ["SYSTEM", "REGISTRY", "COMPANY"],
   },
   {
     id: "settings",
     href: "/settings",
     label: "Settings",
     badge: null,
+    levels: ["SYSTEM"],
   },
 ];
 
-export function visibleNavItems(role: UserRole | null | undefined): NavItem[] {
+export function visibleNavItems(
+  accessLevel: AccessLevel | null | undefined,
+): NavItem[] {
   return navItems
     .filter((item) => {
-      if (!item.roles || item.roles.length === 0) {
+      if (!item.levels || item.levels.length === 0) {
         return true;
       }
-      return role ? item.roles.includes(role) : false;
+      return accessLevel ? item.levels.includes(accessLevel) : false;
     })
     .map((item) =>
-      item.id === "dashboard" && role
-        ? { ...item, href: homeForRole(role) }
+      item.id === "dashboard" &&
+      accessLevel &&
+      isOperationalAccessLevel(accessLevel)
+        ? { ...item, href: homeForAccessLevel(accessLevel) }
         : item,
     );
 }
@@ -107,6 +113,14 @@ export function visibleNavItems(role: UserRole | null | undefined): NavItem[] {
 export function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/dashboard")) {
     return "Dashboard";
+  }
+
+  if (pathname.startsWith("/property-search/")) {
+    return "Property Details";
+  }
+
+  if (pathname.startsWith("/transactions/")) {
+    return "Transaction Details";
   }
 
   const exact = navItems.find((item) => item.href === pathname);

@@ -39,7 +39,7 @@ export function StatsCard({
     <article
       className={`group relative overflow-hidden rounded-xl border p-4 shadow-[0_2px_4px_rgba(0,0,0,0.04)] transition-all duration-300 hover:shadow-[0_8px_16px_rgba(0,0,0,0.08)] ${
         isHighlight
-          ? "border-gray-800 bg-black"
+          ? "border-surface-inverse/40 bg-black"
           : "border-border-subtle bg-surface"
       }`}
     >
@@ -96,7 +96,7 @@ function iconBadgeClass(variant: StatsCardVariant): string {
     case "info":
       return "bg-primary-subtle text-primary";
     default:
-      return "bg-surface-subtle text-black";
+      return "bg-surface-subtle text-text-primary";
   }
 }
 

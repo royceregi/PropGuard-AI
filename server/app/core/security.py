@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -19,6 +20,15 @@ def normalize_nic(value: str) -> str:
     return "".join(value.split()).upper()
 
 
+def normalize_email(value: str) -> str:
+    return value.strip().lower()
+
+
+def hash_nic(value: str) -> str:
+    """SHA-256 hex digest of the normalized NIC (never store raw NIC)."""
+    return hashlib.sha256(normalize_nic(value).encode("utf-8")).hexdigest()
+
+
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
@@ -36,13 +46,19 @@ def verify_password(plain_password: str, password_hash: str | None) -> bool:
         return False
 
 
-def create_access_token(*, user_id: str, nic: str, role: str, full_name: str | None) -> str:
+def create_access_token(
+    *,
+    user_id: str,
+    email: str | None,
+    access_level: str,
+    full_name: str | None,
+) -> str:
     now = datetime.now(timezone.utc)
     expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     payload: dict[str, Any] = {
         "sub": user_id,
-        "nic": nic,
-        "role": role,
+        "email": email,
+        "access_level": access_level,
         "full_name": full_name,
         "iat": int(now.timestamp()),
         "exp": expire,

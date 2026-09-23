@@ -39,7 +39,7 @@ PropGuard AI
 ├── Risk Analysis
 ├── Investigation Reports
 ├── Audit Trail              [Land registry / Super admin]
-├── Users                    [Super admin]
+├── User Management          [Land registry / Super admin]
 └── Settings
 ```
 
@@ -107,67 +107,67 @@ Analytics to include when data exists:
 
 ---
 
-## 3. Property Search / Retrieval
+## 3. Property Search
 
-This page demonstrates Information Retrieval.
+Search **properties** (not transactions). Wired to `GET /api/v1/properties/`.
 
-Support:
+1. **Property Filters** — `q`, district, city, land type, usage, verification status, legal status.
+2. **Property Results** — paginated table of property records.
 
-- Structured search: property ID, transaction ID, title deed, owner ID, registration number, wallet, date range, location, risk level
-- Natural-language search for the IR agent
+Natural-language / IR agent search comes later. Transaction forensic search lives on **Transactions**.
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│ Search Property Transactions                            │
-│                                                         │
-│ 🔍 "Show high-value transactions for this property"     │
-│                         [ Search ]                      │
+│ Property Filters                                        │
+│ Search | District | City | Land | Usage | Status        │
+│                              [Clear] [Search Properties]│
 └─────────────────────────────────────────────────────────┘
-
-Search understanding
-  Property ID: ...
-  Intent: high-value history
-  Filters: risk, date, location
-
-Results
-  Transaction ID | Date | Type | Value | Risk | Relevance
+┌─────────────────────────────────────────────────────────┐
+│ Property Results                                        │
+│ ID | Name/Address | Location | Type | Value | Status    │
+└─────────────────────────────────────────────────────────┘
 ```
 
-Example queries:
+## 3b. Transactions
+
+Dedicated transaction investigation page (`/transactions`).
+
+1. **Forensic Filters** — `GET /api/v1/property-transactions/` (`transaction_id`, `registration_type`, `area_name`, date, `project_name`, value range).
+2. **Views** — grid uses transaction cards; list uses **Investigation Results** table (risk/export placeholders until those APIs exist).
 
 ```text
-Find all high-value transactions for this property.
-Show previous owners.
-Find transactions with document hash mismatches.
-Show properties with rapid ownership changes.
+┌─────────────────────────────────────────────────────────┐
+│ Forensic Filters                                        │
+│ TXN ID | Type | Area | Date | Project | Value | Usage   │
+│                              [Clear] [Run Query]        │
+└─────────────────────────────────────────────────────────┘
+┌── Results ────────────────────────────── [List] [Grid] ─┐
+│ List → Investigation Results table                      │
+│ Grid → Transaction cards                                │
+└─────────────────────────────────────────────────────────┘
 ```
-
-Show retrieved evidence rank and relevance. Log the query in `query_logs` / `query_retrievals`.
 
 ---
 
-## 4. Property verification page
+## 4. Property verification / details page
 
-**Required demo screen.**
+**Required demo screen.** Route: `/property-search/[id]`.
 
-Input:
-
-```text
-property_id
-title_deed_number
-transaction_id
-```
+Loads `GET /api/v1/properties/{property_id}/full`.
 
 Output:
 
 - Property details
 - Current owner
 - Ownership history
-- Registration status
+- Registration / legal status
 - Encumbrances
-- Blockchain status
-- Document status
-- Risk level
+- Documents (hash + verification status)
+- Related transactions
+- Blockchain status (placeholder until Phase 3)
+- Risk level (placeholder until Phase 4)
+
+Linked from Property Search (property ID + **View** action) and from Transaction Details when a property ID is present.
 
 Real-estate company users use this before a transaction. Public users see it only for properties they own.
 
@@ -206,26 +206,25 @@ Every failed check must show the compared values and a short reason.
 
 ---
 
-## 6. Blockchain history page
+## 6. Blockchain verification page
 
-Show the hash chain for a property:
+Route: `/blockchain-verification`.
+
+Web3-style verification console (white canvas + dark `#0d1117` widgets, emerald `#10b981` accents, monospace technical data):
+
+1. **Document Input & Hash Generator** — Property ID, seller/buyer wallets, value, currency → **Generate SHA-256 Hash** (Web Crypto). Copyable hash output + forward status bar.
+2. **Technical Fingerprint** — JSON payload, computed hash, blockchain TX hash (explorer link), block number, UTC timestamp.
+3. **Live Hash Comparison** — local vs on-chain hash; on-chain hash supports blur/mask + reveal; green check + **VERIFIED — IMMUTABLE RECORD CONFIRMED** when aligned.
+
+Prototype loads real rows from `core.blockchain_transactions` (joined to `property_transactions` for property id / currency). Payload commitment is SHA-256 of sorted-key JSON of property/wallets/value/currency. Wire deeper chain checks as Phase 3 continues.
+
+Also keep the hash-chain history view as a follow-on:
 
 ```text
 Property Transaction History
-
  ┌─────────────┐
- │ Block 10201 │  TX-001   Hash: A123
+ │ Block …     │
  └──────┬──────┘
-        ▼
- ┌─────────────┐
- │ Block 10342 │  TX-002   Hash: B782   Prev: A123
- └──────┬──────┘
-        ▼
- ┌─────────────┐
- │ Block 10482 │  TX-003   Hash: C921   Prev: B782
- └─────────────┘
-
-Blockchain Integrity    VALID / INVALID
 ```
 
 Hashes should be copyable. Truncate in the layout, not in the stored value.
@@ -298,8 +297,8 @@ Land registry can mark the case as **reviewed**. Do not offer “delete investig
 | --- | --- | --- |
 | Public user | My properties, own verification | Other people’s PII and private documents |
 | Real estate company | Pre-transaction check, submit for analysis | Official history edits |
-| Land registry | Approve/reject, confirm ownership, resolve flags | Deleting cases (review instead) |
-| Super admin | Users, dataset load, thresholds, agent logs, health | — |
+| Land registry | Approve/reject transactions, confirm ownership, resolve flags, User Management (create pending users) | Deleting cases (review instead); approving users |
+| Super admin | User Management (approve/reject users), dataset load, thresholds, agent logs, health | — |
 
 ---
 
