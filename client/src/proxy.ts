@@ -3,14 +3,19 @@ import { jwtDecode } from "jwt-decode";
 import { AUTH_COOKIE_NAME } from "@/lib/auth/constants";
 import {
   canAccessPath,
-  homeForRole,
+  homeForAccessLevel,
   isAuthPage,
   isPublicPage,
 } from "@/lib/auth/roles";
-import { isUserRole, type UserRole } from "@/lib/auth/types";
+import {
+  isOperationalAccessLevel,
+  type OperationalAccessLevel,
+} from "@/lib/auth/types";
 
 interface AccessTokenPayload {
   sub?: string;
+  access_level?: string;
+  /** Legacy JWT claim — ignored when access_level is present. */
   role?: string;
   exp?: number;
 }
@@ -22,7 +27,7 @@ export function proxy(request: NextRequest) {
   if (isAuthPage(pathname)) {
     if (session) {
       return NextResponse.redirect(
-        new URL(homeForRole(session.role), request.url),
+        new URL(homeForAccessLevel(session.accessLevel), request.url),
       );
     }
     return NextResponse.next();
@@ -30,7 +35,7 @@ export function proxy(request: NextRequest) {
 
   if (pathname === "/dashboard" && session) {
     return NextResponse.redirect(
-      new URL(homeForRole(session.role), request.url),
+      new URL(homeForAccessLevel(session.accessLevel), request.url),
     );
   }
 
@@ -44,14 +49,14 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (!canAccessPath(pathname, session.role)) {
+  if (!canAccessPath(pathname, session.accessLevel)) {
     return NextResponse.redirect(
-      new URL(homeForRole(session.role), request.url),
+      new URL(homeForAccessLevel(session.accessLevel), request.url),
     );
   }
 
   const response = NextResponse.next();
-  response.headers.set("x-propguard-role", session.role);
+  response.headers.set("x-propguard-access-level", session.accessLevel);
   return response;
 }
 
@@ -59,7 +64,9 @@ export const config = {
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };
 
-function readSession(token: string | undefined): { role: UserRole } | null {
+function readSession(
+  token: string | undefined,
+): { accessLevel: OperationalAccessLevel } | null {
   if (!token) {
     return null;
   }
@@ -69,10 +76,11 @@ function readSession(token: string | undefined): { role: UserRole } | null {
     if (payload.exp && payload.exp * 1000 < Date.now()) {
       return null;
     }
-    if (!isUserRole(payload.role)) {
+    const level = payload.access_level || payload.role;
+    if (!isOperationalAccessLevel(level)) {
       return null;
     }
-    return { role: payload.role };
+    return { accessLevel: level };
   } catch {
     return null;
   }

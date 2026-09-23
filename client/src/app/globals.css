@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @config "../../tailwind.config.cjs";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --breakpoint-sm: 480px;
   --breakpoint-md: 768px;
@@ -24,110 +26,229 @@
   --color-gray-800: #1e293b;
   --color-gray-900: #0f172a;
 
-  /* Primary */
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-500: #0058be;
-  --color-primary-600: #2170e4;
-  --color-primary-900: #001e2c;
+  /* Primary scale */
+  --color-primary-100: var(--pg-primary-100);
+  --color-primary-200: var(--pg-primary-200);
+  --color-primary-500: var(--pg-primary);
+  --color-primary-600: var(--pg-primary-hover);
+  --color-primary-900: var(--pg-primary-dark);
 
-  /* Secondary */
-  --color-secondary-300: #7bd0ff;
-  --color-secondary-500: #38bdf8;
-  --color-secondary-900: #004c69;
+  /* Secondary scale */
+  --color-secondary-300: var(--pg-secondary-hover);
+  --color-secondary-500: var(--pg-secondary);
+  --color-secondary-900: var(--pg-secondary-dark);
 
   /* Success */
-  --color-green-500: #10b981;
-  --color-green-600: #059669;
+  --color-green-500: var(--pg-success);
+  --color-green-600: var(--pg-success-hover);
 
   /* Warning */
-  --color-yellow-500: #f59e0b;
-  --color-yellow-600: #d97706;
+  --color-yellow-500: var(--pg-warning);
+  --color-yellow-600: var(--pg-warning-hover);
 
   /* Danger */
-  --color-red-100: #ffdad6;
-  --color-red-500: #ef4444;
-  --color-red-700: #ba1a1a;
-  --color-red-900: #93000a;
+  --color-red-100: var(--pg-critical-container);
+  --color-red-500: var(--pg-danger);
+  --color-red-700: var(--pg-critical);
+  --color-red-900: var(--pg-critical-dark);
 
   /* Accent */
-  --color-orange-100: #ffdcc6;
-  --color-orange-200: #ffb786;
-  --color-orange-500: #924700;
-  --color-orange-600: #b75b00;
-  --color-orange-900: #311400;
+  --color-orange-100: var(--pg-accent-container);
+  --color-orange-200: var(--pg-accent-container-alt);
+  --color-orange-500: var(--pg-accent);
+  --color-orange-600: var(--pg-accent-hover);
+  --color-orange-900: var(--pg-accent-text);
 
   /* Surfaces */
-  --color-surface: #ffffff;
-  --color-surface-canvas: #f8fafc;
-  --color-surface-subtle: #f1f5f9;
-  --color-surface-muted: #e2e8f0;
-  --color-surface-elevated: #ffffff;
-  --color-surface-inverse: #1e293b;
+  --color-surface: var(--pg-surface);
+  --color-surface-canvas: var(--pg-surface-canvas);
+  --color-surface-subtle: var(--pg-surface-subtle);
+  --color-surface-muted: var(--pg-surface-muted);
+  --color-surface-elevated: var(--pg-surface-elevated);
+  --color-surface-inverse: var(--pg-surface-inverse);
 
   /* Text */
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted: #64748b;
-  --color-text-inverse: #ffffff;
+  --color-text-primary: var(--pg-text-primary);
+  --color-text-secondary: var(--pg-text-secondary);
+  --color-text-muted: var(--pg-text-muted);
+  --color-text-inverse: var(--pg-text-inverse);
 
   /* Borders */
-  --color-border: #cbd5e1;
-  --color-border-subtle: #e2e8f0;
-  --color-outline: #64748b;
+  --color-border: var(--pg-border);
+  --color-border-subtle: var(--pg-border-subtle);
+  --color-outline: var(--pg-outline);
 
   /* Primary */
-  --color-primary: #0058be;
-  --color-primary-hover: #2170e4;
-  --color-primary-subtle: #dbeafe;
-  --color-primary-subtle-alt: #bfdbfe;
-  --color-primary-dark: #001e2c;
+  --color-primary: var(--pg-primary);
+  --color-primary-hover: var(--pg-primary-hover);
+  --color-primary-subtle: var(--pg-primary-subtle);
+  --color-primary-subtle-alt: var(--pg-primary-subtle-alt);
+  --color-primary-dark: var(--pg-primary-dark);
 
   /* Secondary */
-  --color-secondary: #38bdf8;
-  --color-secondary-hover: #7bd0ff;
-  --color-secondary-dark: #004c69;
+  --color-secondary: var(--pg-secondary);
+  --color-secondary-hover: var(--pg-secondary-hover);
+  --color-secondary-dark: var(--pg-secondary-dark);
 
   /* Links */
-  --color-link: #0058be;
-  --color-link-hover: #2170e4;
+  --color-link: var(--pg-link);
+  --color-link-hover: var(--pg-link-hover);
 
   /* Status */
-  --color-success: #10b981;
-  --color-success-hover: #059669;
-  --color-success-container: #d1fae5;
+  --color-success: var(--pg-success);
+  --color-success-hover: var(--pg-success-hover);
+  --color-success-container: var(--pg-success-container);
 
-  --color-warning: #f59e0b;
-  --color-warning-hover: #d97706;
+  --color-warning: var(--pg-warning);
+  --color-warning-hover: var(--pg-warning-hover);
 
-  --color-danger: #ef4444;
+  --color-danger: var(--pg-danger);
 
-  --color-critical: #ba1a1a;
-  --color-critical-dark: #93000a;
-  --color-critical-container: #ffdad6;
+  --color-critical: var(--pg-critical);
+  --color-critical-dark: var(--pg-critical-dark);
+  --color-critical-container: var(--pg-critical-container);
 
   /* Accent */
-  --color-accent: #924700;
-  --color-accent-hover: #b75b00;
-  --color-accent-container: #ffdcc6;
-  --color-accent-container-alt: #ffb786;
-  --color-accent-text: #311400;
+  --color-accent: var(--pg-accent);
+  --color-accent-hover: var(--pg-accent-hover);
+  --color-accent-container: var(--pg-accent-container);
+  --color-accent-container-alt: var(--pg-accent-container-alt);
+  --color-accent-text: var(--pg-accent-text);
 
-  --color-background: #f8fafc;
-  --color-foreground: #0f172a;
+  --color-background: var(--pg-background);
+  --color-foreground: var(--pg-foreground);
 }
 
 :root {
   color-scheme: light;
+
+  --pg-background: #f8fafc;
+  --pg-foreground: #0f172a;
+
+  --pg-surface: #ffffff;
+  --pg-surface-canvas: #f8fafc;
+  --pg-surface-subtle: #f1f5f9;
+  --pg-surface-muted: #e2e8f0;
+  --pg-surface-elevated: #ffffff;
+  --pg-surface-inverse: #1e293b;
+
+  --pg-text-primary: #0f172a;
+  --pg-text-secondary: #475569;
+  --pg-text-muted: #64748b;
+  --pg-text-inverse: #ffffff;
+
+  --pg-border: #cbd5e1;
+  --pg-border-subtle: #e2e8f0;
+  --pg-outline: #64748b;
+
+  --pg-primary: #0058be;
+  --pg-primary-hover: #2170e4;
+  --pg-primary-subtle: #dbeafe;
+  --pg-primary-subtle-alt: #bfdbfe;
+  --pg-primary-dark: #001e2c;
+  --pg-primary-100: #dbeafe;
+  --pg-primary-200: #bfdbfe;
+
+  --pg-secondary: #38bdf8;
+  --pg-secondary-hover: #7bd0ff;
+  --pg-secondary-dark: #004c69;
+
+  --pg-link: #0058be;
+  --pg-link-hover: #2170e4;
+
+  --pg-success: #10b981;
+  --pg-success-hover: #059669;
+  --pg-success-container: #d1fae5;
+
+  --pg-warning: #f59e0b;
+  --pg-warning-hover: #d97706;
+
+  --pg-danger: #ef4444;
+  --pg-critical: #ba1a1a;
+  --pg-critical-dark: #93000a;
+  --pg-critical-container: #ffdad6;
+
+  --pg-accent: #924700;
+  --pg-accent-hover: #b75b00;
+  --pg-accent-container: #ffdcc6;
+  --pg-accent-container-alt: #ffb786;
+  --pg-accent-text: #311400;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --pg-background: #070b12;
+  --pg-foreground: #f1f5f9;
+
+  --pg-surface: #0e1520;
+  --pg-surface-canvas: #0a1018;
+  --pg-surface-subtle: #162032;
+  --pg-surface-muted: #1e2a3d;
+  --pg-surface-elevated: #182334;
+  --pg-surface-inverse: #e2e8f0;
+
+  --pg-text-primary: #f1f5f9;
+  --pg-text-secondary: #94a3b8;
+  --pg-text-muted: #64748b;
+  --pg-text-inverse: #ffffff;
+
+  --pg-border: #2a3648;
+  --pg-border-subtle: #1a2433;
+  --pg-outline: #7bd0ff;
+
+  --pg-primary: #3b82f6;
+  --pg-primary-hover: #60a5fa;
+  --pg-primary-subtle: #0b2440;
+  --pg-primary-subtle-alt: #123456;
+  --pg-primary-dark: #93c5fd;
+  --pg-primary-100: #0b2440;
+  --pg-primary-200: #123456;
+
+  --pg-secondary: #38bdf8;
+  --pg-secondary-hover: #7bd0ff;
+  --pg-secondary-dark: #0c4a6e;
+
+  --pg-link: #60a5fa;
+  --pg-link-hover: #93c5fd;
+
+  --pg-success: #34d399;
+  --pg-success-hover: #6ee7b7;
+  --pg-success-container: #064e3b;
+
+  --pg-warning: #fbbf24;
+  --pg-warning-hover: #fcd34d;
+
+  --pg-danger: #f87171;
+  --pg-critical: #fca5a5;
+  --pg-critical-dark: #fecaca;
+  --pg-critical-container: #450a0a;
+
+  --pg-accent: #fb923c;
+  --pg-accent-hover: #fdba74;
+  --pg-accent-container: #431407;
+  --pg-accent-container-alt: #7c2d12;
+  --pg-accent-text: #ffedd5;
 }
 
 html {
-  background: var(--color-background);
+  background: var(--pg-background);
 }
 
 body {
   margin: 0;
-  background: var(--color-background);
-  color: var(--color-foreground);
+  background: var(--pg-background);
+  color: var(--pg-foreground);
   font-family: var(--font-poppins), sans-serif;
+}
+
+/* Intentional dark ledger widgets on the verification console */
+.ledger-panel {
+  background: #0d1117;
+  border-color: #1f2937;
+}
+
+.dark .ledger-panel {
+  background: #0a0f16;
+  border-color: var(--pg-border);
 }

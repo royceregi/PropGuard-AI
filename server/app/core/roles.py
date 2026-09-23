@@ -3,16 +3,43 @@ from __future__ import annotations
 from enum import Enum
 
 
-class UserRole(str, Enum):
-    SUPER_ADMIN = "SUPER_ADMIN"
-    LAND_REGISTRY = "LAND_REGISTRY"
-    REAL_ESTATE_COMPANY = "REAL_ESTATE_COMPANY"
-    PUBLIC_USER = "PUBLIC_USER"
+class AccessLevel(str, Enum):
+    """Authorization identity stored on core.users.access_level."""
 
+    SYSTEM = "SYSTEM"  # Super Admin
+    REGISTRY = "REGISTRY"  # Land Registry
+    COMPANY = "COMPANY"  # Real Estate Company
+    PUBLIC = "PUBLIC"  # End user with system access (after admin approval)
+    STANDARD = "STANDARD"  # End user in DB, no system access yet
+    ELEVATED = "ELEVATED"  # Nominated by registry/company; awaiting super admin
+
+
+# Backward-compatible alias used by older imports.
+UserRole = AccessLevel
+
+ACCESS_LEVEL_LABELS: dict[str, str] = {
+    AccessLevel.SYSTEM.value: "Super Admin",
+    AccessLevel.REGISTRY.value: "Land Registry",
+    AccessLevel.COMPANY.value: "Real Estate Company",
+    AccessLevel.PUBLIC.value: "Public User",
+    AccessLevel.STANDARD.value: "Standard",
+    AccessLevel.ELEVATED.value: "Pending Approval",
+}
+
+# Levels that may sign in and use the app (must also be is_active).
+# STANDARD / ELEVATED end users have no system access until promoted to PUBLIC.
+OPERATIONAL_ACCESS_LEVELS = {
+    AccessLevel.SYSTEM.value,
+    AccessLevel.REGISTRY.value,
+    AccessLevel.COMPANY.value,
+    AccessLevel.PUBLIC.value,
+}
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
-    UserRole.SUPER_ADMIN.value: [
+    AccessLevel.SYSTEM.value: [
         "manage_users",
+        "approve_users",
+        "set_access_level",
         "load_datasets",
         "view_system_health",
         "view_all_transactions",
@@ -28,7 +55,9 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "view_own_property",
         "view_audit_trail",
     ],
-    UserRole.LAND_REGISTRY.value: [
+    AccessLevel.REGISTRY.value: [
+        "manage_users",
+        "activate_users",
         "register_properties",
         "approve_transactions",
         "verify_documents",
@@ -45,7 +74,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "view_audit_trail",
         "review_agent_logs_limited",
     ],
-    UserRole.REAL_ESTATE_COMPANY.value: [
+    AccessLevel.COMPANY.value: [
+        "activate_users",
         "search_properties",
         "verify_ownership",
         "verify_title",
@@ -57,7 +87,15 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "run_risk_analysis",
         "view_own_property",
     ],
-    UserRole.PUBLIC_USER.value: [
+    AccessLevel.PUBLIC.value: [
+        "view_own_property",
+        "view_own_history",
+        "check_own_verification",
+        "view_transaction_status",
+        "submit_inquiry",
+        "view_limited_public_property",
+    ],
+    AccessLevel.STANDARD.value: [
         "view_own_property",
         "view_own_history",
         "check_own_verification",
@@ -68,5 +106,22 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
 }
 
 
-def permissions_for_role(role: str) -> list[str]:
-    return list(ROLE_PERMISSIONS.get(role, []))
+def normalize_access_level(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip().upper()
+    return cleaned or None
+
+
+def permissions_for_role(access_level: str) -> list[str]:
+    key = normalize_access_level(access_level) or ""
+    return list(ROLE_PERMISSIONS.get(key, []))
+
+
+def permissions_for_access_level(access_level: str) -> list[str]:
+    return permissions_for_role(access_level)
+
+
+def is_operational_access(access_level: str | None) -> bool:
+    key = normalize_access_level(access_level)
+    return key in OPERATIONAL_ACCESS_LEVELS

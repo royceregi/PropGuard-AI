@@ -5,33 +5,33 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 import { Icons } from "@/components/icons";
 import { useAuth } from "@/hooks/useAuth";
-import { canAccessPath, homeForRole } from "@/lib/auth/roles";
-import { isUserRole } from "@/lib/auth/types";
+import { canAccessPath, homeForAccessLevel } from "@/lib/auth/roles";
+import { isOperationalAccessLevel } from "@/lib/auth/types";
 
-const REMEMBER_KEY = "propguard.rememberNic";
-const NIC_PATTERN = /^(?:\d{9}[VX]|\d{12})$/;
+const REMEMBER_KEY = "propguard.rememberEmail";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
-  const nicId = useId();
+  const emailId = useId();
   const passwordId = useId();
   const rememberId = useId();
 
-  const [nic, setNic] = useState(() => readRememberedNic());
+  const [email, setEmail] = useState(() => readRememberedEmail());
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(() => hasRememberedNic());
+  const [rememberMe, setRememberMe] = useState(() => hasRememberedEmail());
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [nicTouched, setNicTouched] = useState(false);
+  const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  const nicError = getNicError(nic);
+  const emailError = getEmailError(email);
   const passwordError = getPasswordError(password);
-  const showNicError = (submitted || nicTouched) && Boolean(nicError);
+  const showEmailError = (submitted || emailTouched) && Boolean(emailError);
   const showPasswordError =
     (submitted || passwordTouched) && Boolean(passwordError);
 
@@ -40,37 +40,38 @@ export function LoginForm() {
     setSubmitted(true);
     setServerError(null);
 
-    if (nicError || passwordError) {
+    if (emailError || passwordError) {
       return;
     }
 
     setLoading(true);
 
+    const normalizedEmail = email.trim().toLowerCase();
     if (rememberMe) {
-      window.localStorage.setItem(REMEMBER_KEY, nic);
+      window.localStorage.setItem(REMEMBER_KEY, normalizedEmail);
     } else {
       window.localStorage.removeItem(REMEMBER_KEY);
     }
 
     try {
-      const user = await login({ nic, password });
+      const user = await login({ email: normalizedEmail, password });
       const next = searchParams.get("next");
-      const roleHome = isUserRole(user.role)
-        ? homeForRole(user.role)
+      const roleHome = isOperationalAccessLevel(user.access_level)
+        ? homeForAccessLevel(user.access_level)
         : "/dashboard/my-properties";
       const destination =
         next &&
         next.startsWith("/") &&
         !next.startsWith("//") &&
-        isUserRole(user.role) &&
-        canAccessPath(next, user.role)
+        isOperationalAccessLevel(user.access_level) &&
+        canAccessPath(next, user.access_level)
           ? next
           : roleHome;
       router.replace(destination);
       router.refresh();
     } catch (error) {
       setServerError(
-        error instanceof Error ? error.message : "Invalid NIC or password",
+        error instanceof Error ? error.message : "Invalid email or password",
       );
     } finally {
       setLoading(false);
@@ -90,40 +91,44 @@ export function LoginForm() {
 
       <div className="space-y-1.5">
         <label
-          htmlFor={nicId}
+          htmlFor={emailId}
           className="block text-sm font-medium text-text-primary"
         >
-          National Identity Card
+          Email
         </label>
         <div className="relative">
-          <Icons.Badge className="pointer-events-none absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 text-text-muted" />
+          <Icons.Mail className="pointer-events-none absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 text-text-muted" />
           <input
-            id={nicId}
-            name="nic"
-            type="text"
-            autoComplete="username"
-            inputMode="text"
-            value={nic}
-            aria-invalid={showNicError}
-            aria-describedby={showNicError ? `${nicId}-error` : undefined}
-            onBlur={() => setNicTouched(true)}
+            id={emailId}
+            name="email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            value={email}
+            aria-invalid={showEmailError}
+            aria-describedby={showEmailError ? `${emailId}-error` : undefined}
+            onBlur={() => setEmailTouched(true)}
             onChange={(event) => {
-              setNic(event.target.value.toUpperCase());
+              setEmail(event.target.value);
               setServerError(null);
             }}
-            placeholder="900000001V"
-            className={`h-11 w-full rounded-lg border bg-surface py-2 pr-3 pl-10 text-sm tracking-wide text-text-primary outline-none placeholder:text-text-muted focus:border-primary ${
-              showNicError ? "border-danger" : "border-border"
+            placeholder="maria.s@example.com"
+            className={`h-11 w-full rounded-lg border bg-surface py-2 pr-3 pl-10 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-primary ${
+              showEmailError ? "border-danger" : "border-border"
             }`}
           />
         </div>
-        {showNicError ? (
-          <p id={`${nicId}-error`} role="alert" className="text-xs text-danger">
-            {nicError}
+        {showEmailError ? (
+          <p
+            id={`${emailId}-error`}
+            role="alert"
+            className="text-xs text-danger"
+          >
+            {emailError}
           </p>
         ) : (
           <p className="text-xs text-text-muted">
-            Use your NIC number to access the verification workspace.
+            Sign in with your registered email address.
           </p>
         )}
       </div>
@@ -195,7 +200,7 @@ export function LoginForm() {
             onChange={(event) => setRememberMe(event.target.checked)}
             className="h-4 w-4 rounded border-border text-primary accent-primary"
           />
-          Remember NIC
+          Remember email
         </label>
         <Link
           href="/forgot-password"
@@ -225,13 +230,13 @@ export function LoginForm() {
   );
 }
 
-function getNicError(nic: string): string | null {
-  const value = nic.trim().toUpperCase();
+function getEmailError(email: string): string | null {
+  const value = email.trim();
   if (!value) {
-    return "National Identity Card number is required.";
+    return "Email is required.";
   }
-  if (!NIC_PATTERN.test(value)) {
-    return "Enter a valid NIC (9 digits + V/X, or 12 digits).";
+  if (!EMAIL_PATTERN.test(value)) {
+    return "Enter a valid email address.";
   }
   return null;
 }
@@ -246,13 +251,13 @@ function getPasswordError(password: string): string | null {
   return null;
 }
 
-function readRememberedNic(): string {
+function readRememberedEmail(): string {
   if (typeof window === "undefined") {
     return "";
   }
   return window.localStorage.getItem(REMEMBER_KEY) ?? "";
 }
 
-function hasRememberedNic(): boolean {
-  return readRememberedNic().length > 0;
+function hasRememberedEmail(): boolean {
+  return readRememberedEmail().length > 0;
 }

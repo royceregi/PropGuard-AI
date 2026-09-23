@@ -1,60 +1,74 @@
-import type { UserRole } from "@/lib/auth/types";
+import type {
+  AccessLevel,
+  OperationalAccessLevel,
+} from "@/lib/auth/types";
 
-export const ROLE_HOME: Record<UserRole, string> = {
-  SUPER_ADMIN: "/dashboard/admin",
-  LAND_REGISTRY: "/dashboard/registry",
-  REAL_ESTATE_COMPANY: "/dashboard/company",
-  PUBLIC_USER: "/dashboard/my-properties",
+export const ACCESS_HOME: Record<OperationalAccessLevel, string> = {
+  SYSTEM: "/dashboard/admin",
+  REGISTRY: "/dashboard/registry",
+  COMPANY: "/dashboard/company",
+  PUBLIC: "/dashboard/my-properties",
 };
 
-export const ROLE_LABELS: Record<UserRole, string> = {
-  SUPER_ADMIN: "Super Admin",
-  LAND_REGISTRY: "Land Registry",
-  REAL_ESTATE_COMPANY: "Real Estate Company",
-  PUBLIC_USER: "Public User",
+export const ACCESS_LABELS: Record<AccessLevel, string> = {
+  SYSTEM: "Super Admin",
+  REGISTRY: "Land Registry",
+  COMPANY: "Real Estate Company",
+  PUBLIC: "Public User",
+  STANDARD: "Standard",
+  ELEVATED: "Pending",
 };
+
+/** @deprecated Use ACCESS_HOME / ACCESS_LABELS. */
+export const ROLE_HOME = ACCESS_HOME;
+export const ROLE_LABELS = ACCESS_LABELS;
 
 const AUTH_PAGES = new Set(["/login", "/forgot-password"]);
 const PUBLIC_PAGES = new Set(["/", "/login", "/forgot-password"]);
 
-const ROUTE_ACCESS: Array<{ prefix: string; roles: UserRole[] }> = [
-  {
-    prefix: "/dashboard/admin",
-    roles: ["SUPER_ADMIN"],
-  },
-  {
-    prefix: "/dashboard/registry",
-    roles: ["SUPER_ADMIN", "LAND_REGISTRY"],
-  },
-  {
-    prefix: "/dashboard/company",
-    roles: ["SUPER_ADMIN", "REAL_ESTATE_COMPANY"],
-  },
-  {
-    prefix: "/dashboard/my-properties",
-    roles: ["SUPER_ADMIN", "PUBLIC_USER"],
-  },
-  {
-    prefix: "/users",
-    roles: ["SUPER_ADMIN"],
-  },
-  {
-    prefix: "/audit-trail",
-    roles: ["SUPER_ADMIN", "LAND_REGISTRY"],
-  },
-  {
-    prefix: "/property-search",
-    roles: ["SUPER_ADMIN", "LAND_REGISTRY", "REAL_ESTATE_COMPANY"],
-  },
-  {
-    prefix: "/ai-investigation",
-    roles: ["SUPER_ADMIN", "LAND_REGISTRY", "REAL_ESTATE_COMPANY"],
-  },
-  {
-    prefix: "/risk-analysis",
-    roles: ["SUPER_ADMIN", "LAND_REGISTRY", "REAL_ESTATE_COMPANY"],
-  },
-];
+const ROUTE_ACCESS: Array<{ prefix: string; levels: OperationalAccessLevel[] }> =
+  [
+    {
+      prefix: "/dashboard/admin",
+      levels: ["SYSTEM"],
+    },
+    {
+      prefix: "/dashboard/registry",
+      levels: ["SYSTEM", "REGISTRY"],
+    },
+    {
+      prefix: "/dashboard/company",
+      levels: ["SYSTEM", "COMPANY"],
+    },
+    {
+      prefix: "/dashboard/my-properties",
+      levels: ["SYSTEM", "PUBLIC"],
+    },
+    {
+      prefix: "/users",
+      levels: ["SYSTEM", "REGISTRY", "COMPANY"],
+    },
+    {
+      prefix: "/audit-trail",
+      levels: ["SYSTEM", "REGISTRY"],
+    },
+    {
+      prefix: "/property-search",
+      levels: ["SYSTEM", "REGISTRY", "COMPANY"],
+    },
+    {
+      prefix: "/ai-investigation",
+      levels: ["SYSTEM", "REGISTRY", "COMPANY"],
+    },
+    {
+      prefix: "/risk-analysis",
+      levels: ["SYSTEM", "REGISTRY", "COMPANY"],
+    },
+    {
+      prefix: "/settings",
+      levels: ["SYSTEM"],
+    },
+  ];
 
 export function isAuthPage(pathname: string): boolean {
   return AUTH_PAGES.has(pathname);
@@ -64,7 +78,10 @@ export function isPublicPage(pathname: string): boolean {
   return PUBLIC_PAGES.has(pathname);
 }
 
-export function canAccessPath(pathname: string, role: UserRole): boolean {
+export function canAccessPath(
+  pathname: string,
+  accessLevel: OperationalAccessLevel,
+): boolean {
   const rule = ROUTE_ACCESS.find(
     (item) =>
       pathname === item.prefix || pathname.startsWith(`${item.prefix}/`),
@@ -72,9 +89,22 @@ export function canAccessPath(pathname: string, role: UserRole): boolean {
   if (!rule) {
     return true;
   }
-  return rule.roles.includes(role);
+  return rule.levels.includes(accessLevel);
 }
 
-export function homeForRole(role: UserRole): string {
-  return ROLE_HOME[role];
+export function homeForAccessLevel(accessLevel: OperationalAccessLevel): string {
+  return ACCESS_HOME[accessLevel];
+}
+
+/** @deprecated Use homeForAccessLevel. */
+export function homeForRole(accessLevel: OperationalAccessLevel): string {
+  return homeForAccessLevel(accessLevel);
+}
+
+export function labelForAccessLevel(accessLevel: string | null | undefined): string {
+  if (!accessLevel?.trim()) {
+    return "—";
+  }
+  const key = accessLevel.trim().toUpperCase() as AccessLevel;
+  return ACCESS_LABELS[key] ?? accessLevel;
 }

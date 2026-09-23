@@ -3,14 +3,19 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { homeForRole } from "@/lib/auth/roles";
+import { homeForAccessLevel } from "@/lib/auth/roles";
+import { isOperationalAccessLevel } from "@/lib/auth/types";
 
 export default function DashboardIndexPage() {
   const router = useRouter();
   const { user } = useAuth();
 
   useEffect(() => {
-    router.replace(user ? homeForRole(user.role) : "/login");
+    if (user && isOperationalAccessLevel(user.access_level)) {
+      router.replace(homeForAccessLevel(user.access_level));
+      return;
+    }
+    router.replace("/login");
   }, [router, user]);
 
   return (

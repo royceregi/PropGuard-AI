@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     body = await request.json();
   } catch {
     return NextResponse.json(
-      { detail: "Invalid NIC or password" },
+      { detail: "Invalid email or password" },
       { status: 400 },
     );
   }
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     const detail =
       data && "detail" in data && typeof data.detail === "string"
         ? data.detail
-        : "Invalid NIC or password";
+        : "Invalid email or password";
     return NextResponse.json(
       { detail },
       { status: backendResponse.status || 401 },
