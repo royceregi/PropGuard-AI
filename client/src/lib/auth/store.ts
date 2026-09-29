@@ -17,7 +17,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       setSession: (user, token) => set({ user, token }),
-      clearSession: () => set({ user: null, token: null }),
+      clearSession: () => set({ user: null, token: null })
     }),
     {
       name: "propguard-auth",
@@ -26,12 +26,12 @@ export const useAuthStore = create<AuthState>()(
           return {
             getItem: () => null,
             setItem: () => undefined,
-            removeItem: () => undefined,
+            removeItem: () => undefined
           };
         }
         return sessionStorage;
       }),
-      partialize: (state) => ({ user: state.user, token: state.token }),
-    },
-  ),
+      partialize: (state) => ({ user: state.user, token: state.token })
+    }
+  )
 );

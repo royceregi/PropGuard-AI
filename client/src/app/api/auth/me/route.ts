@@ -15,7 +15,7 @@ export async function GET() {
 
   const backendResponse = await fetch(`${API_URL}/api/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
+    cache: "no-store"
   });
 
   const data = await backendResponse.json().catch(() => null);

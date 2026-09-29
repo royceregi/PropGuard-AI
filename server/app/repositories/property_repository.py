@@ -29,6 +29,108 @@ def get_property(db: Session, property_id: str) -> Property | None:
     return db.query(Property).filter(Property.property_id == property_id).first()
 
 
+def accessible_property_ids_for_user(db: Session, user_id: str) -> set[str]:
+    """Owned, ownership-history, or transaction-party (shared) property IDs."""
+    owned_ids, history_ids, party_ids = property_access_sets(db, user_id)
+    return owned_ids | history_ids | party_ids
+
+
+def property_access_sets(
+    db: Session, user_id: str
+) -> tuple[set[str], set[str], set[str]]:
+    """(current-owner IDs, ownership-history IDs, transaction-party IDs) for a user."""
+    if not user_id:
+        return set(), set(), set()
+
+    owned_ids = {
+        row[0]
+        for row in db.query(Property.property_id)
+        .filter(Property.current_owner_id == user_id)
+        .all()
+        if row[0]
+    }
+    history_ids = {
+        row[0]
+        for row in db.query(PropertyOwnershipHistory.property_id)
+        .filter(PropertyOwnershipHistory.owner_id == user_id)
+        .distinct()
+        .all()
+        if row[0]
+    }
+    party_ids = {
+        row[0]
+        for row in db.query(PropertyTransaction.property_id)
+        .join(
+            TransactionParty,
+            TransactionParty.transaction_id == PropertyTransaction.transaction_id,
+        )
+        .filter(TransactionParty.user_id == user_id)
+        .distinct()
+        .all()
+        if row[0]
+    }
+    return owned_ids, history_ids, party_ids
+
+
+def user_can_access_property(db: Session, user_id: str, property_id: str) -> bool:
+    if not user_id or not property_id:
+        return False
+
+    prop = get_property(db, property_id)
+    if prop is None:
+        return False
+    if prop.current_owner_id == user_id:
+        return True
+
+    history_hit = (
+        db.query(PropertyOwnershipHistory.ownership_id)
+        .filter(
+            PropertyOwnershipHistory.property_id == property_id,
+            PropertyOwnershipHistory.owner_id == user_id,
+        )
+        .first()
+    )
+    if history_hit is not None:
+        return True
+
+    party_hit = (
+        db.query(TransactionParty.transaction_party_id)
+        .join(
+            PropertyTransaction,
+            PropertyTransaction.transaction_id == TransactionParty.transaction_id,
+        )
+        .filter(
+            PropertyTransaction.property_id == property_id,
+            TransactionParty.user_id == user_id,
+        )
+        .first()
+    )
+    return party_hit is not None
+
+
+def user_can_access_transaction(
+    db: Session, user_id: str, transaction_id: str
+) -> bool:
+    if not user_id or not transaction_id:
+        return False
+
+    party_hit = (
+        db.query(TransactionParty.transaction_party_id)
+        .filter(
+            TransactionParty.transaction_id == transaction_id,
+            TransactionParty.user_id == user_id,
+        )
+        .first()
+    )
+    if party_hit is not None:
+        return True
+
+    tx = get_transaction(db, transaction_id)
+    if tx is None or not tx.property_id:
+        return False
+    return user_can_access_property(db, user_id, tx.property_id)
+
+
 def list_properties(
     db: Session,
     *,
@@ -41,8 +143,14 @@ def list_properties(
     usage_type: str | None = None,
     verification_status: str | None = None,
     legal_status: str | None = None,
+    property_ids: set[str] | None = None,
 ) -> tuple[list[Property], int]:
     query = db.query(Property)
+
+    if property_ids is not None:
+        if not property_ids:
+            return [], 0
+        query = query.filter(Property.property_id.in_(property_ids))
 
     if q:
         pattern = f"%{q.strip()}%"
@@ -98,9 +206,14 @@ def list_documents(
     transaction_id: str | None = None,
     document_type: str | None = None,
     verification_status: str | None = None,
+    property_ids: set[str] | None = None,
 ) -> tuple[list[PropertyDocument], int]:
     query = db.query(PropertyDocument)
 
+    if property_ids is not None:
+        if not property_ids:
+            return [], 0
+        query = query.filter(PropertyDocument.property_id.in_(property_ids))
     if property_id:
         query = query.filter(PropertyDocument.property_id == property_id)
     if transaction_id:
@@ -144,9 +257,14 @@ def list_ownership_history(
     owner_id: str | None = None,
     ownership_status: str | None = None,
     active_only: bool = False,
+    property_ids: set[str] | None = None,
 ) -> tuple[list[PropertyOwnershipHistory], int]:
     query = db.query(PropertyOwnershipHistory)
 
+    if property_ids is not None:
+        if not property_ids:
+            return [], 0
+        query = query.filter(PropertyOwnershipHistory.property_id.in_(property_ids))
     if property_id:
         query = query.filter(PropertyOwnershipHistory.property_id == property_id)
     if owner_id:
@@ -202,9 +320,14 @@ def list_transactions(
     date_to: date | None = None,
     min_value: Decimal | None = None,
     max_value: Decimal | None = None,
+    property_ids: set[str] | None = None,
 ) -> tuple[list[PropertyTransaction], int]:
     query = db.query(PropertyTransaction)
 
+    if property_ids is not None:
+        if not property_ids:
+            return [], 0
+        query = query.filter(PropertyTransaction.property_id.in_(property_ids))
     if transaction_id:
         query = query.filter(
             PropertyTransaction.transaction_id.ilike(f"%{transaction_id.strip()}%")

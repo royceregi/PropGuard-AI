@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.api.property_access import (
+    ensure_property_access,
+    scoped_property_ids,
+)
 from app.core.database import get_db
 from app.models.user import User as UserModel
 from app.repositories import property_repository
@@ -12,13 +16,14 @@ from app.schemas.property import (
     PaginatedProperties,
     PaginatedPropertyDocuments,
     PaginatedPropertyTransactions,
+    PaginatedUserRelatedProperties,
     PropertyDetailRead,
     PropertyRead,
 )
 
 router = APIRouter()
 
-VIEW_ROLES = ["SYSTEM", "REGISTRY", "COMPANY"]
+VIEW_ROLES = ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
 
 
 @router.get("/", response_model=PaginatedProperties)
@@ -33,8 +38,9 @@ def list_properties(
     verification_status: str | None = None,
     legal_status: str | None = None,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    allowed_ids = scoped_property_ids(db, current_user)
     items, total = property_repository.list_properties(
         db,
         skip=skip,
@@ -46,6 +52,7 @@ def list_properties(
         usage_type=usage_type,
         verification_status=verification_status,
         legal_status=legal_status,
+        property_ids=allowed_ids,
     )
     return PaginatedProperties(
         items=property_repository.enrich_properties(db, items),
@@ -55,12 +62,29 @@ def list_properties(
     )
 
 
+@router.get("/mine", response_model=PaginatedUserRelatedProperties)
+def list_my_properties(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
+):
+    """Properties linked to the signed-in user (owner, history, or shared party)."""
+    items, total = property_repository.list_properties_for_user(
+        db, current_user.user_id, skip=skip, limit=limit
+    )
+    return PaginatedUserRelatedProperties(
+        items=items, total=total, skip=skip, limit=limit
+    )
+
+
 @router.get("/{property_id}", response_model=PropertyRead)
 def get_property(
     property_id: str,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    ensure_property_access(db, current_user, property_id)
     row = property_repository.get_property(db, property_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Property not found")
@@ -71,8 +95,9 @@ def get_property(
 def get_property_full(
     property_id: str,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    ensure_property_access(db, current_user, property_id)
     row = property_repository.get_property(db, property_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Property not found")
@@ -104,8 +129,9 @@ def list_property_documents(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    ensure_property_access(db, current_user, property_id)
     if property_repository.get_property(db, property_id) is None:
         raise HTTPException(status_code=404, detail="Property not found")
     items, total = property_repository.list_documents(
@@ -125,8 +151,9 @@ def list_property_transactions(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    ensure_property_access(db, current_user, property_id)
     if property_repository.get_property(db, property_id) is None:
         raise HTTPException(status_code=404, detail="Property not found")
     items, total = property_repository.list_transactions(
@@ -150,8 +177,9 @@ def list_property_ownership_history(
     limit: int = Query(50, ge=1, le=200),
     active_only: bool = False,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    ensure_property_access(db, current_user, property_id)
     if property_repository.get_property(db, property_id) is None:
         raise HTTPException(status_code=404, detail="Property not found")
     items, total = property_repository.list_ownership_history(

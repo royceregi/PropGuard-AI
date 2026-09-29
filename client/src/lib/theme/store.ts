@@ -33,7 +33,7 @@ export const useThemeStore = create<ThemeState>()(
         const next: ThemeMode = get().theme === "dark" ? "light" : "dark";
         applyThemeClass(next);
         set({ theme: next });
-      },
+      }
     }),
     {
       name: THEME_STORAGE_KEY,
@@ -42,7 +42,7 @@ export const useThemeStore = create<ThemeState>()(
           return {
             getItem: () => null,
             setItem: () => undefined,
-            removeItem: () => undefined,
+            removeItem: () => undefined
           };
         }
         return localStorage;
@@ -52,9 +52,9 @@ export const useThemeStore = create<ThemeState>()(
         if (state?.theme) {
           applyThemeClass(state.theme);
         }
-      },
-    },
-  ),
+      }
+    }
+  )
 );
 
 export { THEME_STORAGE_KEY };

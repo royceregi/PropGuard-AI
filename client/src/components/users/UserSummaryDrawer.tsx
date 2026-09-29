@@ -12,7 +12,7 @@ import {
   isPendingAccessLevel,
   shortenHash,
   shortenWallet,
-  type ManagedUser,
+  type ManagedUser
 } from "@/lib/users/types";
 
 interface UserSummaryDrawerProps {
@@ -43,7 +43,7 @@ export function UserSummaryDrawer({
   onClose,
   onToggleActive,
   onToggleRegular,
-  onAccessLevelChange,
+  onAccessLevelChange
 }: UserSummaryDrawerProps) {
   useEffect(() => {
     if (!open) {
@@ -69,7 +69,7 @@ export function UserSummaryDrawer({
   const level = (user.access_level || "").toUpperCase();
   const pending = isPendingAccessLevel(user.access_level);
   const selectValue = SYSTEM_END_USER_LEVELS.includes(
-    level as (typeof SYSTEM_END_USER_LEVELS)[number],
+    level as (typeof SYSTEM_END_USER_LEVELS)[number]
   )
     ? level
     : level || "STANDARD";
@@ -103,36 +103,40 @@ export function UserSummaryDrawer({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-          <div className="flex flex-wrap gap-1.5">
-            {isSystem ? (
-              <StatusBadge
-                label={labelForAccessLevel(user.access_level)}
-                variant={level === "ELEVATED" ? "warning" : "info"}
-                size="sm"
-              />
-            ) : level === "PUBLIC" ? (
-              <StatusBadge label="Approved" variant="success" size="sm" />
-            ) : (
-              <StatusBadge
-                label={pending ? "Pending" : "Not submitted"}
-                variant={pending ? "warning" : "neutral"}
-                size="sm"
-              />
-            )}
+        <div className="flex flex-wrap gap-1.5">
+          {isSystem ? (
             <StatusBadge
-              label={user.is_active ? "Active" : "Inactive"}
-              variant={user.is_active ? "success" : "warning"}
+              label={labelForAccessLevel(user.access_level)}
+              variant={level === "ELEVATED" ? "warning" : "info"}
               size="sm"
             />
+          ) : level === "PUBLIC" ? (
+            <StatusBadge label="Approved" variant="success" size="sm" />
+          ) : (
             <StatusBadge
-              label={user.mfa_enabled ? "MFA On" : "MFA Off"}
-              variant="neutral"
+              label={pending ? "Pending" : "Not submitted"}
+              variant={pending ? "warning" : "neutral"}
               size="sm"
             />
-          </div>
+          )}
+          <StatusBadge
+            label={user.is_active ? "Active" : "Inactive"}
+            variant={user.is_active ? "success" : "warning"}
+            size="sm"
+          />
+          <StatusBadge
+            label={user.mfa_enabled ? "MFA On" : "MFA Off"}
+            variant="neutral"
+            size="sm"
+          />
+        </div>
 
         <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border-subtle pt-4">
-          <SummaryField label="NIC Hash" value={shortenHash(user.nic_hash)} mono />
+          <SummaryField
+            label="NIC Hash"
+            value={shortenHash(user.nic_hash)}
+            mono
+          />
           <SummaryField label="Username" value={user.username} />
           <SummaryField label="Email" value={user.email} />
           <SummaryField label="Phone" value={user.phone_number} />
@@ -157,56 +161,56 @@ export function UserSummaryDrawer({
           />
         </dl>
 
-          {canSetAccessLevel && onAccessLevelChange ? (
-            <div className="mt-5 border-t border-border-subtle pt-4">
-              <label className="block text-sm font-medium text-text-primary">
-                Access level
-              </label>
-              <p className="mt-1 text-xs text-text-muted">
-                Promote Pending → Public to grant system access. Standard has no
-                login until approved.
-              </p>
-              <select
-                value={selectValue}
-                disabled={levelBusy}
-                onChange={(event) => onAccessLevelChange(event.target.value)}
-                className="mt-2 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary"
-              >
-                {!SYSTEM_END_USER_LEVELS.includes(
-                  selectValue as (typeof SYSTEM_END_USER_LEVELS)[number],
-                ) ? (
-                  <option value={selectValue}>
-                    {labelForAccessLevel(selectValue)}
-                  </option>
-                ) : null}
-                {SYSTEM_END_USER_LEVELS.map((item) => (
-                  <option key={item} value={item}>
-                    {labelForAccessLevel(item)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
+        {canSetAccessLevel && onAccessLevelChange ? (
+          <div className="mt-5 border-t border-border-subtle pt-4">
+            <label className="block text-sm font-medium text-text-primary">
+              Access level
+            </label>
+            <p className="mt-1 text-xs text-text-muted">
+              Promote Pending → Public to grant system access. Standard has no
+              login until approved.
+            </p>
+            <select
+              value={selectValue}
+              disabled={levelBusy}
+              onChange={(event) => onAccessLevelChange(event.target.value)}
+              className="mt-2 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary"
+            >
+              {!SYSTEM_END_USER_LEVELS.includes(
+                selectValue as (typeof SYSTEM_END_USER_LEVELS)[number]
+              ) ? (
+                <option value={selectValue}>
+                  {labelForAccessLevel(selectValue)}
+                </option>
+              ) : null}
+              {SYSTEM_END_USER_LEVELS.map((item) => (
+                <option key={item} value={item}>
+                  {labelForAccessLevel(item)}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
 
-          {canTogglePending && onToggleRegular && level !== "PUBLIC" ? (
-            <div className="mt-5 flex items-center justify-between gap-3 border-t border-border-subtle pt-4">
-              <div>
-                <p className="text-sm font-medium text-text-primary">
-                  Submit for approval
-                </p>
-                <p className="text-xs text-text-muted">
-                  {pending
-                    ? "Pending Super Admin review"
-                    : "Off = Standard (no access)"}
-                </p>
-              </div>
-              <AccountStatusToggle
-                checked={pending}
-                busy={levelBusy}
-                onToggle={onToggleRegular}
-              />
+        {canTogglePending && onToggleRegular && level !== "PUBLIC" ? (
+          <div className="mt-5 flex items-center justify-between gap-3 border-t border-border-subtle pt-4">
+            <div>
+              <p className="text-sm font-medium text-text-primary">
+                Submit for approval
+              </p>
+              <p className="text-xs text-text-muted">
+                {pending
+                  ? "Pending Super Admin review"
+                  : "Off = Standard (no access)"}
+              </p>
             </div>
-          ) : null}
+            <AccountStatusToggle
+              checked={pending}
+              busy={levelBusy}
+              onToggle={onToggleRegular}
+            />
+          </div>
+        ) : null}
 
         {canManageStatus ? (
           <div className="mt-5 flex items-center justify-between gap-3 border-t border-border-subtle pt-4">
@@ -249,7 +253,7 @@ export function UserSummaryDrawer({
 function SummaryField({
   label,
   value,
-  mono,
+  mono
 }: {
   label: string;
   value: string | null | undefined;

@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 
 export default function AppLayout({
-  children,
+  children
 }: Readonly<{
   children: React.ReactNode;
 }>) {

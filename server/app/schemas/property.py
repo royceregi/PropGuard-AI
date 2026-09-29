@@ -25,8 +25,6 @@ class PropertyRead(BaseModel):
     address: str | None = None
     district: str | None = None
     city: str | None = None
-    latitude: Decimal | None = None
-    longitude: Decimal | None = None
     land_area: Decimal | None = None
     area_unit: str | None = None
     land_type: str | None = None

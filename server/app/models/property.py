@@ -10,7 +10,9 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.database import Base
 
@@ -25,8 +27,6 @@ class Property(Base):
     address = Column(Text)
     district = Column(String)
     city = Column(String)
-    latitude = Column(Numeric)
-    longitude = Column(Numeric)
     land_area = Column(Numeric)
     area_unit = Column(String)
     land_type = Column(String)
@@ -133,6 +133,7 @@ class BlockchainTransaction(Base):
     tx_hash = Column(String(255), unique=True)
     previous_hash = Column(String(255))
     property_hash = Column(String(255))
+    transaction_data_hash = Column(String(255))
     block_number = Column(BigInteger)
     block_timestamp = Column(DateTime)
     from_wallet = Column(String(255))
@@ -147,6 +148,34 @@ class BlockchainTransaction(Base):
     created_at = Column(DateTime)
 
 
+class RegistrationDetail(Base):
+    __tablename__ = "registration_details"
+    __table_args__ = {"schema": "core"}
+
+    registration_id = Column(BigInteger, primary_key=True)
+    transaction_id = Column(Text, index=True)
+    registration_number = Column(String)
+    registration_date = Column(Date)
+    registration_fee = Column(Numeric)
+    tax_amount = Column(Numeric)
+    other_fee = Column(Numeric)
+    total_amount_paid = Column(Numeric)
+    currency = Column(String)
+    registration_status = Column(String)
+
+
+class PropertySnapshot(Base):
+    """Canonical property payload anchored by a ledger property_hash (content-addressed)."""
+
+    __tablename__ = "property_snapshots"
+    __table_args__ = {"schema": "core"}
+
+    property_hash = Column(String(64), primary_key=True)
+    property_id = Column(Text, index=True)
+    payload = Column(JSONB, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 __all__ = [
     "Property",
     "PropertyDocument",
@@ -154,4 +183,6 @@ __all__ = [
     "PropertyTransaction",
     "TransactionParty",
     "BlockchainTransaction",
+    "PropertySnapshot",
+    "RegistrationDetail",
 ]

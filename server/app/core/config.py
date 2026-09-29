@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     AUTH_COOKIE_NAME: str = "propguard_access_token"
 
+    # Simulated registry smart contract + Ed25519 ledger signing key (hex, 32 raw bytes each).
+    # Without REGISTRY_SIGNING_KEY / REGISTRY_PUBLIC_KEY, signatures are not written or checked.
+    REGISTRY_CONTRACT_ADDRESS: str = "0x70726f7067756172642d72656769737472790001"
+    REGISTRY_SIGNING_KEY: str = ""
+    REGISTRY_PUBLIC_KEY: str = ""
+
     # AI / LLM (Report Agent, NL search — fill in .env; unused until agents are wired)
     AI_ENABLED: bool = False
     AI_PROVIDER: str = "gemini"  # gemini | openai | ollama

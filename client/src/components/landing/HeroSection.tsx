@@ -21,7 +21,7 @@ export function HeroSection() {
         style={{
           backgroundImage:
             "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.3) 1px, transparent 0)",
-          backgroundSize: "50px 50px",
+          backgroundSize: "50px 50px"
         }}
       />
       <div className="pointer-events-none absolute -top-24 right-0 h-80 w-80 rounded-full bg-primary/20 blur-3xl" />

@@ -16,11 +16,11 @@ const EMPTY_STATS: UserStats = {
   total_users: 0,
   approved_users: 0,
   pending_approval: 0,
-  public_users: 0,
+  public_users: 0
 };
 
 export function UserManagementStats({
-  refreshKey = 0,
+  refreshKey = 0
 }: {
   refreshKey?: number;
 }) {
@@ -82,7 +82,7 @@ export function UserManagementStats({
           trend={{
             value: "",
             label: "Active accounts",
-            positive: true,
+            positive: true
           }}
         />
         <StatsCard
@@ -93,7 +93,7 @@ export function UserManagementStats({
           trend={{
             value: "Review",
             label: "Awaiting activation",
-            isError: true,
+            isError: true
           }}
         />
         <StatsCard

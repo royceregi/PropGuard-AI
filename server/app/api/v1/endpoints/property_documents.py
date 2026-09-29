@@ -4,6 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.api.property_access import (
+    ensure_property_access,
+    ensure_transaction_access,
+    scoped_property_ids,
+)
 from app.core.database import get_db
 from app.models.user import User as UserModel
 from app.repositories import property_repository
@@ -11,7 +16,7 @@ from app.schemas.property import PaginatedPropertyDocuments, PropertyDocumentRea
 
 router = APIRouter()
 
-VIEW_ROLES = ["SYSTEM", "REGISTRY", "COMPANY"]
+VIEW_ROLES = ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
 
 
 @router.get("/", response_model=PaginatedPropertyDocuments)
@@ -23,8 +28,14 @@ def list_documents(
     document_type: str | None = None,
     verification_status: str | None = None,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    allowed_ids = scoped_property_ids(db, current_user)
+    if property_id:
+        ensure_property_access(db, current_user, property_id)
+    if transaction_id:
+        ensure_transaction_access(db, current_user, transaction_id)
+
     items, total = property_repository.list_documents(
         db,
         skip=skip,
@@ -33,6 +44,7 @@ def list_documents(
         transaction_id=transaction_id,
         document_type=document_type,
         verification_status=verification_status,
+        property_ids=allowed_ids,
     )
     return PaginatedPropertyDocuments(
         items=items, total=total, skip=skip, limit=limit
@@ -43,9 +55,13 @@ def list_documents(
 def get_document(
     document_id: int,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
     row = property_repository.get_document(db, document_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Document not found")
+    if row.property_id:
+        ensure_property_access(db, current_user, row.property_id)
+    elif row.transaction_id:
+        ensure_transaction_access(db, current_user, row.transaction_id)
     return row

@@ -5,14 +5,45 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.roles import is_operational_access, permissions_for_access_level
-from app.core.security import create_access_token, normalize_email, verify_password
+from app.core.security import (
+    create_access_token,
+    hash_password,
+    normalize_email,
+    verify_password,
+)
 from app.models.user import User
 from app.repositories import user_repository
 from app.api.deps import get_current_user
-from app.schemas.auth import CurrentUserResponse, LoginRequest, LoginResponse
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    CurrentUserResponse,
+    LoginRequest,
+    LoginResponse,
+    MessageResponse,
+    ProfileUpdateRequest,
+)
 from app.schemas.user import UserPublic
 
 router = APIRouter()
+
+
+def _current_user_response(user: User) -> CurrentUserResponse:
+    level = (user.access_level or "").strip().upper()
+    return CurrentUserResponse(
+        user_id=user.user_id,
+        full_name=user.full_name,
+        email=user.email,
+        access_level=level,
+        wallet_address=user.wallet_address,
+        username=user.username,
+        phone_number=user.phone_number,
+        nic_hash=user.nic_hash,
+        kyc_status=user.kyc_status,
+        mfa_enabled=bool(user.mfa_enabled),
+        is_active=bool(user.is_active),
+        last_login=user.last_login,
+        permissions=permissions_for_access_level(level),
+    )
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -77,18 +108,60 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse
 
 @router.get("/me", response_model=CurrentUserResponse)
 def read_current_user(current_user: User = Depends(get_current_user)) -> CurrentUserResponse:
-    level = (current_user.access_level or "").strip().upper()
-    return CurrentUserResponse(
-        user_id=current_user.user_id,
-        full_name=current_user.full_name,
-        email=current_user.email,
-        access_level=level,
-        wallet_address=current_user.wallet_address,
-        username=current_user.username,
-        nic_hash=current_user.nic_hash,
-        kyc_status=current_user.kyc_status,
-        mfa_enabled=bool(current_user.mfa_enabled),
-        is_active=bool(current_user.is_active),
-        last_login=current_user.last_login,
-        permissions=permissions_for_access_level(level),
-    )
+    return _current_user_response(current_user)
+
+
+@router.patch("/me", response_model=CurrentUserResponse)
+def update_current_user_profile(
+    payload: ProfileUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> CurrentUserResponse:
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No profile fields to update",
+        )
+
+    if "full_name" in data:
+        name = (data["full_name"] or "").strip()
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Full name cannot be empty",
+            )
+        current_user.full_name = name
+
+    if "phone_number" in data:
+        phone = data["phone_number"]
+        current_user.phone_number = (
+            phone.strip() if isinstance(phone, str) and phone.strip() else None
+        )
+
+    db.commit()
+    db.refresh(current_user)
+    return _current_user_response(current_user)
+
+
+@router.post("/change-password", response_model=MessageResponse)
+def change_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> MessageResponse:
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from the current password",
+        )
+
+    current_user.password_hash = hash_password(payload.new_password)
+    db.commit()
+    return MessageResponse(detail="Password updated successfully")

@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function hydrate() {
       try {
         const response = await fetch("/api/auth/me", {
-          credentials: "include",
+          credentials: "include"
         });
         if (!response.ok) {
           if (!cancelled) {

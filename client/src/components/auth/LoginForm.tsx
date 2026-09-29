@@ -71,7 +71,7 @@ export function LoginForm() {
       router.refresh();
     } catch (error) {
       setServerError(
-        error instanceof Error ? error.message : "Invalid email or password",
+        error instanceof Error ? error.message : "Invalid email or password"
       );
     } finally {
       setLoading(false);

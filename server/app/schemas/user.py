@@ -28,23 +28,6 @@ class UserRead(UserPublic):
     last_login: datetime | None = None
 
 
-class UserCreate(BaseModel):
-    """Legacy create payload — prefer activating existing users via is_active."""
-
-    user_id: str | None = None
-    username: str
-    full_name: str
-    email: EmailStr
-    password: str = Field(..., min_length=8, max_length=128)
-    nic: str = Field(..., min_length=5, max_length=32, description="Raw NIC; stored as nic_hash only")
-    access_level: AccessLevel = AccessLevel.STANDARD
-    phone_number: str | None = None
-    wallet_address: str | None = None
-    kyc_status: str | None = None
-    mfa_enabled: bool = False
-    is_active: bool | None = None
-
-
 class UserUpdate(BaseModel):
     username: str | None = None
     full_name: str | None = None
