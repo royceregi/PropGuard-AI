@@ -8,13 +8,13 @@ function useIsClient() {
   return useSyncExternalStore(
     () => () => {},
     () => true,
-    () => false,
+    () => false
   );
 }
 
 function ClientOnlyIcon({
   children,
-  className,
+  className
 }: {
   children: ReactNode;
   className?: string;

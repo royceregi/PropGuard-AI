@@ -10,12 +10,12 @@ const poppins = Poppins({
   variable: "--font-poppins",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-  display: "swap",
+  display: "swap"
 });
 
 export const metadata: Metadata = {
   title: "PropGuard AI",
-  description: "Property Transaction Intelligence and Verification Platform",
+  description: "Property Transaction Intelligence and Verification Platform"
 };
 
 const themeInitScript = `
@@ -42,7 +42,7 @@ const themeInitScript = `
 `;
 
 export default function RootLayout({
-  children,
+  children
 }: Readonly<{
   children: React.ReactNode;
 }>) {

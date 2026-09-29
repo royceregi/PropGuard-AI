@@ -1,7 +1,7 @@
 import { TransactionDetailsUI } from "@/components/transactions/TransactionDetailsUI";
 
 export default async function TransactionDetailsPage({
-  params,
+  params
 }: {
   params: Promise<{ id: string }>;
 }) {
@@ -9,7 +9,7 @@ export default async function TransactionDetailsPage({
 
   return (
     <div className="p-3 sm:p-4 lg:p-6 xl:p-8">
-      <TransactionDetailsUI key={id} />
+      <TransactionDetailsUI transactionId={id} />
     </div>
   );
 }

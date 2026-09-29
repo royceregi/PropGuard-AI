@@ -4,6 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.api.property_access import (
+    ensure_property_access,
+    scoped_property_ids,
+)
 from app.core.database import get_db
 from app.models.user import User as UserModel
 from app.repositories import property_repository
@@ -14,7 +18,7 @@ from app.schemas.property import (
 
 router = APIRouter()
 
-VIEW_ROLES = ["SYSTEM", "REGISTRY", "COMPANY"]
+VIEW_ROLES = ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
 
 
 @router.get("/", response_model=PaginatedOwnershipHistory)
@@ -26,8 +30,12 @@ def list_ownership_history(
     ownership_status: str | None = None,
     active_only: bool = False,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    allowed_ids = scoped_property_ids(db, current_user)
+    if property_id:
+        ensure_property_access(db, current_user, property_id)
+
     items, total = property_repository.list_ownership_history(
         db,
         skip=skip,
@@ -36,6 +44,7 @@ def list_ownership_history(
         owner_id=owner_id,
         ownership_status=ownership_status,
         active_only=active_only,
+        property_ids=allowed_ids,
     )
     return PaginatedOwnershipHistory(
         items=property_repository.enrich_ownership_rows(db, items),
@@ -49,9 +58,11 @@ def list_ownership_history(
 def get_ownership(
     ownership_id: int,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
     row = property_repository.get_ownership(db, ownership_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Ownership record not found")
+    if row.property_id:
+        ensure_property_access(db, current_user, row.property_id)
     return property_repository.enrich_ownership_rows(db, [row])[0]

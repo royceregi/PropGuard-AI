@@ -13,7 +13,7 @@ function cookieOptions() {
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: AUTH_COOKIE_MAX_AGE,
+    maxAge: AUTH_COOKIE_MAX_AGE
   };
 }
 
@@ -24,14 +24,14 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json(
       { detail: "Invalid email or password" },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
   const backendResponse = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(body)
   });
 
   const data = (await backendResponse.json().catch(() => null)) as
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         : "Invalid email or password";
     return NextResponse.json(
       { detail },
-      { status: backendResponse.status || 401 },
+      { status: backendResponse.status || 401 }
     );
   }
 

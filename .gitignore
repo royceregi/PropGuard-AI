@@ -80,3 +80,6 @@ node_modules/
 *.pem
 *.key
 *.crt
+
+# Documentation
+Documents/

@@ -1,5 +1,5 @@
-import { RoleDashboard } from "@/components/dashboard/RoleDashboard";
+import { MyPropertiesDashboard } from "@/components/dashboard/MyPropertiesDashboard";
 
 export default function MyPropertiesDashboardPage() {
-  return <RoleDashboard />;
+  return <MyPropertiesDashboard />;
 }

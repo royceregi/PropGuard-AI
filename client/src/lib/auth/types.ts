@@ -4,7 +4,7 @@ export const ACCESS_LEVELS = [
   "COMPANY",
   "PUBLIC",
   "STANDARD",
-  "ELEVATED",
+  "ELEVATED"
 ] as const;
 
 export type AccessLevel = (typeof ACCESS_LEVELS)[number];
@@ -14,7 +14,7 @@ export const OPERATIONAL_ACCESS_LEVELS = [
   "SYSTEM",
   "REGISTRY",
   "COMPANY",
-  "PUBLIC",
+  "PUBLIC"
 ] as const;
 
 export type OperationalAccessLevel = (typeof OPERATIONAL_ACCESS_LEVELS)[number];
@@ -29,6 +29,7 @@ export interface AuthUser {
   access_level: AccessLevel;
   wallet_address: string | null;
   username?: string | null;
+  phone_number?: string | null;
   nic_hash?: string | null;
   kyc_status?: string | null;
   mfa_enabled?: boolean;
@@ -44,20 +45,20 @@ export interface LoginResponse {
 }
 
 export function isAccessLevel(
-  value: string | undefined | null,
+  value: string | undefined | null
 ): value is AccessLevel {
   return ACCESS_LEVELS.includes(value as AccessLevel);
 }
 
 export function isOperationalAccessLevel(
-  value: string | undefined | null,
+  value: string | undefined | null
 ): value is OperationalAccessLevel {
   return OPERATIONAL_ACCESS_LEVELS.includes(value as OperationalAccessLevel);
 }
 
 /** @deprecated Use isAccessLevel / isOperationalAccessLevel. */
 export function isUserRole(
-  value: string | undefined | null,
+  value: string | undefined | null
 ): value is AccessLevel {
   return isOperationalAccessLevel(value) || isAccessLevel(value);
 }

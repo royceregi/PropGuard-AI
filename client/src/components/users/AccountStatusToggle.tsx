@@ -13,7 +13,7 @@ export function AccountStatusToggle({
   disabled = false,
   busy = false,
   labelledBy,
-  onToggle,
+  onToggle
 }: AccountStatusToggleProps) {
   return (
     <button

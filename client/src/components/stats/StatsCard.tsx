@@ -31,7 +31,7 @@ export function StatsCard({
   variant = "default",
   customFooter,
   progress = 99.8,
-  tag = "IMMUTABLE",
+  tag = "IMMUTABLE"
 }: StatsCardProps) {
   const isHighlight = variant === "highlight";
 
@@ -104,7 +104,7 @@ function DefaultFooter({
   variant,
   trend,
   progress,
-  tag,
+  tag
 }: {
   variant: StatsCardVariant;
   trend?: StatsCardTrend;

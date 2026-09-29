@@ -6,17 +6,16 @@ import { Icons } from "@/components/icons";
 import { getPageTitle } from "@/components/layout/nav";
 import {
   ProfileMenuModal,
-  type ProfileMenuAction,
+  type ProfileMenuAction
 } from "@/components/layout/ProfileMenuModal";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { ACCESS_LABELS } from "@/lib/auth/roles";
-import { toast } from "@/lib/toast";
 
 export function TopNav({
   collapsed,
   onMenuClick,
-  onToggleCollapse,
+  onToggleCollapse
 }: {
   collapsed: boolean;
   onMenuClick: () => void;
@@ -71,12 +70,7 @@ export function TopNav({
     setShowProfileModal(false);
 
     if (action === "profile") {
-      const username = user?.username?.trim();
-      if (username) {
-        router.push(`/users/${encodeURIComponent(username)}`);
-        return;
-      }
-      toast.message("Profile page unavailable for this account yet.");
+      router.push("/profile");
       return;
     }
 
@@ -86,7 +80,7 @@ export function TopNav({
     }
 
     if (action === "change-password") {
-      toast.message("Change password is coming soon.");
+      router.push("/profile?section=password");
     }
   }
 
@@ -281,6 +275,6 @@ function initialsFromName(name: string | null | undefined): string {
 function formatVerifiedAt(date: Date): string {
   return date.toLocaleString(undefined, {
     dateStyle: "medium",
-    timeStyle: "short",
+    timeStyle: "short"
   });
 }

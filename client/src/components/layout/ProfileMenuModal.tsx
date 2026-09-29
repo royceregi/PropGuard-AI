@@ -6,10 +6,7 @@ import { ACCESS_LABELS } from "@/lib/auth/roles";
 import type { AuthUser } from "@/lib/auth/types";
 
 export type ProfileMenuAction =
-  | "profile"
-  | "settings"
-  | "change-password"
-  | "logout";
+  "profile" | "settings" | "change-password" | "logout";
 
 interface ProfileMenuModalProps {
   open: boolean;
@@ -24,11 +21,17 @@ const MENU_ITEMS: {
   label: string;
   icon: keyof typeof Icons;
   tone?: "danger";
+  levels?: Array<"SYSTEM" | "REGISTRY" | "COMPANY" | "PUBLIC">;
 }[] = [
   { action: "profile", label: "Profile", icon: "ManageAccounts" },
-  { action: "settings", label: "Account settings", icon: "Settings" },
+  {
+    action: "settings",
+    label: "Account settings",
+    icon: "Settings",
+    levels: ["SYSTEM"]
+  },
   { action: "change-password", label: "Change password", icon: "Lock" },
-  { action: "logout", label: "Logout", icon: "Logout", tone: "danger" },
+  { action: "logout", label: "Logout", icon: "Logout", tone: "danger" }
 ];
 
 export function ProfileMenuModal({
@@ -36,7 +39,7 @@ export function ProfileMenuModal({
   user,
   loggingOut = false,
   onClose,
-  onAction,
+  onAction
 }: ProfileMenuModalProps) {
   useEffect(() => {
     if (!open) {
@@ -101,7 +104,14 @@ export function ProfileMenuModal({
         </div>
 
         <div className="p-2" role="menu" aria-label="Profile options">
-          {MENU_ITEMS.map((item) => {
+          {MENU_ITEMS.filter((item) => {
+            if (!item.levels || item.levels.length === 0) {
+              return true;
+            }
+            return user?.access_level
+              ? (item.levels as string[]).includes(user.access_level)
+              : false;
+          }).map((item) => {
             const Icon = Icons[item.icon];
             const isLogout = item.action === "logout";
             return (
@@ -118,7 +128,9 @@ export function ProfileMenuModal({
                 }`}
               >
                 <Icon className="h-5 w-5 shrink-0 text-[20px]" />
-                <span>{isLogout && loggingOut ? "Signing out…" : item.label}</span>
+                <span>
+                  {isLogout && loggingOut ? "Signing out…" : item.label}
+                </span>
               </button>
             );
           })}

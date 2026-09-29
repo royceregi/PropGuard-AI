@@ -3,6 +3,9 @@
 import { useEffect, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { isAxiosError } from "axios";
+import ArrowDownward from "@mui/icons-material/ArrowDownward";
+import ArrowUpward from "@mui/icons-material/ArrowUpward";
+import UnfoldMore from "@mui/icons-material/UnfoldMore";
 import { Icons } from "@/components/icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AccountStatusToggle } from "@/components/users/AccountStatusToggle";
@@ -11,14 +14,81 @@ import { useAuth } from "@/hooks/useAuth";
 import { labelForAccessLevel } from "@/lib/auth/roles";
 import { api } from "@/lib/api/client";
 import { toast } from "@/lib/toast";
-import {
-  isPendingAccessLevel,
-  type ManagedUser,
-} from "@/lib/users/types";
+import { isPendingAccessLevel, type ManagedUser } from "@/lib/users/types";
 
 interface UsersTableProps {
   refreshKey?: number;
   onChanged?: () => void;
+}
+
+type SortField =
+  | "full_name"
+  | "user_id"
+  | "email"
+  | "access_level"
+  | "is_active"
+  | "created_at"
+  | "last_login";
+type SortDir = "asc" | "desc";
+
+const SORT_OPTIONS: { value: SortField; label: string }[] = [
+  { value: "created_at", label: "Date joined" },
+  { value: "last_login", label: "Last login" },
+  { value: "full_name", label: "Name" },
+  { value: "user_id", label: "User ID" },
+  { value: "email", label: "Email" },
+  { value: "access_level", label: "Access level" },
+  { value: "is_active", label: "Account status" }
+];
+
+const DEFAULT_DIR: Record<SortField, SortDir> = {
+  full_name: "asc",
+  user_id: "asc",
+  email: "asc",
+  access_level: "asc",
+  is_active: "desc",
+  created_at: "desc",
+  last_login: "desc"
+};
+
+function SortableHeader({
+  label,
+  field,
+  sortBy,
+  sortDir,
+  onSort
+}: {
+  label: string;
+  field: SortField;
+  sortBy: SortField;
+  sortDir: SortDir;
+  onSort: (field: SortField) => void;
+}) {
+  const active = sortBy === field;
+  const Icon = !active
+    ? UnfoldMore
+    : sortDir === "asc"
+      ? ArrowUpward
+      : ArrowDownward;
+  return (
+    <th
+      className="px-4 py-3 font-semibold"
+      aria-sort={
+        active ? (sortDir === "asc" ? "ascending" : "descending") : "none"
+      }
+    >
+      <button
+        type="button"
+        onClick={() => onSort(field)}
+        className={`inline-flex items-center gap-1 uppercase tracking-wider transition-colors hover:text-text-primary ${
+          active ? "text-text-primary" : ""
+        }`}
+      >
+        {label}
+        <Icon className={`!h-3.5 !w-3.5 ${active ? "" : "opacity-50"}`} />
+      </button>
+    </th>
+  );
 }
 
 export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
@@ -36,6 +106,10 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
   const [levelBusyId, setLevelBusyId] = useState<string | null>(null);
   const [prevRefreshKey, setPrevRefreshKey] = useState(refreshKey);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortField>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   if (refreshKey !== prevRefreshKey) {
     setPrevRefreshKey(refreshKey);
@@ -44,11 +118,35 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
   }
 
   useEffect(() => {
+    const handle = window.setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => window.clearTimeout(handle);
+  }, [searchInput]);
+
+  function changeSort(field: SortField) {
+    if (field === sortBy) {
+      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir(DEFAULT_DIR[field]);
+    }
+  }
+
+  useEffect(() => {
     let cancelled = false;
 
     async function fetchUsers() {
       try {
-        const { data } = await api.get<ManagedUser[]>("/api/v1/users/");
+        const params: Record<string, string | number> = { limit: 500 };
+        if (isSystem) {
+          params.sort_by = sortBy;
+          params.sort_dir = sortDir;
+          if (search) {
+            params.q = search;
+          }
+        }
+        const { data } = await api.get<ManagedUser[]>("/api/v1/users/", {
+          params
+        });
         if (cancelled) {
           return;
         }
@@ -71,7 +169,7 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, isSystem, search, sortBy, sortDir]);
 
   const selectedUser =
     users.find((item) => item.user_id === selectedId) ?? null;
@@ -84,7 +182,7 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
 
   function onRowKeyDown(
     event: KeyboardEvent<HTMLTableRowElement>,
-    userId: string,
+    userId: string
   ) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -94,9 +192,7 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
 
   function applyUserUpdate(updated: ManagedUser) {
     setUsers((current) =>
-      current.map((item) =>
-        item.user_id === updated.user_id ? updated : item,
-      ),
+      current.map((item) => (item.user_id === updated.user_id ? updated : item))
     );
     onChanged?.();
   }
@@ -109,7 +205,7 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
     if (
       !nextActive &&
       !window.confirm(
-        `Deactivate ${user.full_name?.trim() || user.user_id}?\n\nThey will not be able to sign in until activated again.`,
+        `Deactivate ${user.full_name?.trim() || user.user_id}?\n\nThey will not be able to sign in until activated again.`
       )
     ) {
       return;
@@ -119,7 +215,7 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
     try {
       const { data } = await api.patch<ManagedUser>(
         `/api/v1/users/${encodeURIComponent(user.user_id)}/active`,
-        { is_active: nextActive },
+        { is_active: nextActive }
       );
       applyUserUpdate(data);
       toast.success(
@@ -127,15 +223,15 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
         {
           description: `${data.full_name?.trim() || data.user_id} is now ${
             nextActive ? "Active" : "Inactive"
-          }.`,
-        },
+          }.`
+        }
       );
     } catch (err) {
       toast.error("Unable to update account status", {
         description:
           isAxiosError(err) && typeof err.response?.data?.detail === "string"
             ? err.response.data.detail
-            : "Please try again.",
+            : "Please try again."
       });
     } finally {
       setStatusBusyId(null);
@@ -150,18 +246,18 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
     try {
       const { data } = await api.patch<ManagedUser>(
         `/api/v1/users/${encodeURIComponent(user.user_id)}/access-level`,
-        { access_level: accessLevel },
+        { access_level: accessLevel }
       );
       applyUserUpdate(data);
       toast.success("Access updated", {
-        description: `${data.full_name?.trim() || data.user_id} → ${labelForAccessLevel(data.access_level)}`,
+        description: `${data.full_name?.trim() || data.user_id} → ${labelForAccessLevel(data.access_level)}`
       });
     } catch (err) {
       toast.error("Unable to update access", {
         description:
           isAxiosError(err) && typeof err.response?.data?.detail === "string"
             ? err.response.data.detail
-            : "Please try again.",
+            : "Please try again."
       });
     } finally {
       setLevelBusyId(null);
@@ -181,7 +277,7 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
     if (
       submitForApproval &&
       !window.confirm(
-        `Submit ${user.full_name?.trim() || user.user_id} for Super Admin approval?\n\nThis sets the account to Pending until Super Admin promotes them to Public.`,
+        `Submit ${user.full_name?.trim() || user.user_id} for Super Admin approval?\n\nThis sets the account to Pending until Super Admin promotes them to Public.`
       )
     ) {
       return;
@@ -201,16 +297,121 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
         aria-label="Users directory"
         className="min-w-0 overflow-hidden rounded-xl border border-border-subtle bg-surface"
       >
+        {isSystem ? (
+          <div className="flex flex-col gap-3 border-b border-border-subtle p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+            <div className="relative w-full sm:max-w-sm">
+              <Icons.Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-text-muted" />
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Search name, username, ID, email or phone"
+                aria-label="Search users"
+                className="h-10 w-full rounded-lg border border-border-subtle bg-surface py-2 pr-9 pl-9 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-primary"
+              />
+              {searchInput ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchInput("")}
+                  aria-label="Clear search"
+                  className="absolute top-1/2 right-2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-text-muted hover:text-text-primary"
+                >
+                  <Icons.Close className="!h-4 !w-4" />
+                </button>
+              ) : null}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="users-sort"
+                className="text-xs font-semibold text-text-muted"
+              >
+                Sort by
+              </label>
+              <select
+                id="users-sort"
+                value={sortBy}
+                onChange={(event) => {
+                  const field = event.target.value as SortField;
+                  setSortBy(field);
+                  setSortDir(DEFAULT_DIR[field]);
+                }}
+                className="h-10 rounded-lg border border-border-subtle bg-surface px-3 text-sm text-text-primary outline-none focus:border-primary"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() =>
+                  setSortDir((dir) => (dir === "asc" ? "desc" : "asc"))
+                }
+                aria-label={
+                  sortDir === "asc" ? "Sort descending" : "Sort ascending"
+                }
+                title={sortDir === "asc" ? "Ascending" : "Descending"}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-surface text-text-secondary transition-colors hover:bg-surface-subtle hover:text-text-primary"
+              >
+                {sortDir === "asc" ? (
+                  <ArrowUpward className="!h-4 !w-4" />
+                ) : (
+                  <ArrowDownward className="!h-4 !w-4" />
+                )}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse text-left text-sm">
             <thead className="bg-surface-subtle text-[11px] font-semibold tracking-wider text-text-muted uppercase">
               <tr>
-                <th className="px-4 py-3 font-semibold">User</th>
-                <th className="px-4 py-3 font-semibold">User ID</th>
-                <th className="px-4 py-3 font-semibold">Email</th>
-                <th className="px-4 py-3 font-semibold">
-                  {isRegistryOrCompany ? "Submit for approval" : "Account Status"}
-                </th>
+                {isSystem ? (
+                  <>
+                    <SortableHeader
+                      label="User"
+                      field="full_name"
+                      sortBy={sortBy}
+                      sortDir={sortDir}
+                      onSort={changeSort}
+                    />
+                    <SortableHeader
+                      label="User ID"
+                      field="user_id"
+                      sortBy={sortBy}
+                      sortDir={sortDir}
+                      onSort={changeSort}
+                    />
+                    <SortableHeader
+                      label="Email"
+                      field="email"
+                      sortBy={sortBy}
+                      sortDir={sortDir}
+                      onSort={changeSort}
+                    />
+                    <SortableHeader
+                      label="Account Status"
+                      field="is_active"
+                      sortBy={sortBy}
+                      sortDir={sortDir}
+                      onSort={changeSort}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <th className="px-4 py-3 font-semibold">User</th>
+                    <th className="px-4 py-3 font-semibold">User ID</th>
+                    <th className="px-4 py-3 font-semibold">Email</th>
+                    <th className="px-4 py-3 font-semibold">
+                      {isRegistryOrCompany
+                        ? "Submit for approval"
+                        : "Account Status"}
+                    </th>
+                  </>
+                )}
                 {!previewOpen ? (
                   <th className="px-4 py-3 font-semibold">Actions</th>
                 ) : null}
@@ -245,7 +446,9 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
                     colSpan={columnCount}
                     className="px-4 py-10 text-center text-sm text-text-muted"
                   >
-                    No users found in the directory.
+                    {isSystem && search
+                      ? `No users match "${search}".`
+                      : "No users found in the directory."}
                   </td>
                 </tr>
               ) : null}
@@ -265,7 +468,9 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
                     onClick={() => openUser(user.user_id)}
                     onKeyDown={(event) => onRowKeyDown(event, user.user_id)}
                     className={`cursor-pointer border-t border-border-subtle transition-colors hover:bg-surface-subtle/80 focus-visible:bg-surface-subtle/80 focus-visible:outline-none ${
-                      selected ? "bg-primary/5 ring-1 ring-inset ring-primary/20" : ""
+                      selected
+                        ? "bg-primary/5 ring-1 ring-inset ring-primary/20"
+                        : ""
                     }`}
                   >
                     <td className="px-4 py-3">
@@ -287,14 +492,16 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
                         <div className="flex items-center gap-2.5">
                           <StatusBadge
                             label={
-                              (user.access_level || "").toUpperCase() === "PUBLIC"
+                              (user.access_level || "").toUpperCase() ===
+                              "PUBLIC"
                                 ? "Approved"
                                 : pending
                                   ? "Pending"
                                   : "Not submitted"
                             }
                             variant={
-                              (user.access_level || "").toUpperCase() === "PUBLIC"
+                              (user.access_level || "").toUpperCase() ===
+                              "PUBLIC"
                                 ? "success"
                                 : pending
                                   ? "warning"
@@ -302,7 +509,8 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
                             }
                             size="sm"
                           />
-                          {(user.access_level || "").toUpperCase() === "PUBLIC" ? null : (
+                          {(user.access_level || "").toUpperCase() ===
+                          "PUBLIC" ? null : (
                             <AccountStatusToggle
                               checked={pending}
                               busy={levelBusy}

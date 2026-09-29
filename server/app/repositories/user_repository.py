@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.roles import AccessLevel, normalize_access_level
 from app.core.security import hash_nic, hash_password, normalize_email
 from app.models.user import User
-from app.schemas.user import UserCreate, UserStats, UserUpdate
+from app.schemas.user import UserStats, UserUpdate
 
 APPROVED_KYC = ("VERIFIED", "APPROVED")
 PENDING_KYC = ("PENDING", "PENDING_APPROVAL", "SUBMITTED", "UNDER_REVIEW")
@@ -75,12 +75,19 @@ def get_user_by_email(db: Session, email: str) -> User | None:
     )
 
 
-def get_user_by_nic_hash(db: Session, nic_hash: str) -> User | None:
-    return db.query(User).filter(User.nic_hash == nic_hash).first()
-
-
 def get_user_by_username(db: Session, username: str) -> User | None:
     return db.query(User).filter(User.username == username).first()
+
+
+USER_SORT_COLUMNS = {
+    "full_name": func.lower(User.full_name),
+    "user_id": User.user_id,
+    "email": func.lower(User.email),
+    "access_level": func.upper(User.access_level),
+    "is_active": User.is_active,
+    "created_at": User.created_at,
+    "last_login": User.last_login,
+}
 
 
 def get_users(
@@ -89,10 +96,35 @@ def get_users(
     limit: int = 100,
     *,
     actor_access_level: str | None = None,
+    search: str | None = None,
+    sort_by: str = "created_at",
+    sort_dir: str = "desc",
 ) -> list[User]:
+    query = _scoped_users_query(db, actor_access_level)
+
+    term = (search or "").strip()
+    if term:
+        escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        query = query.filter(
+            or_(
+                *(
+                    column.ilike(pattern, escape="\\")
+                    for column in (
+                        User.full_name,
+                        User.username,
+                        User.user_id,
+                        User.email,
+                        User.phone_number,
+                    )
+                )
+            )
+        )
+
+    column = USER_SORT_COLUMNS.get(sort_by, User.created_at)
+    ordered = column.asc() if sort_dir == "asc" else column.desc()
     return (
-        _scoped_users_query(db, actor_access_level)
-        .order_by(User.created_at.desc())
+        query.order_by(ordered.nulls_last(), User.user_id.asc())
         .offset(skip)
         .limit(limit)
         .all()
@@ -139,60 +171,6 @@ def get_user_stats(db: Session, *, actor_access_level: str | None = None) -> Use
         pending_approval=int(pending_approval),
         public_users=int(public_users),
     )
-
-
-def create_user(
-    db: Session,
-    user: UserCreate,
-    *,
-    require_approval: bool = False,
-) -> User:
-    email = normalize_email(str(user.email))
-    nic_digest = hash_nic(user.nic)
-
-    if get_user_by_email(db, email) is not None:
-        raise ValueError("Email already registered")
-    if get_user_by_nic_hash(db, nic_digest) is not None:
-        raise ValueError("NIC already registered")
-    if get_user_by_username(db, user.username) is not None:
-        raise ValueError("Username already taken")
-
-    level = normalize_access_level(
-        user.access_level.value if hasattr(user.access_level, "value") else str(user.access_level)
-    ) or AccessLevel.STANDARD.value
-
-    payload = user.model_dump(
-        exclude={
-            "password",
-            "user_id",
-            "nic",
-            "kyc_status",
-            "is_active",
-            "access_level",
-        }
-    )
-    payload["email"] = email
-    payload["nic_hash"] = nic_digest
-    payload["user_id"] = user.user_id or f"USR{email[:8].upper()}"
-    payload["access_level"] = level
-    payload["mfa_enabled"] = bool(user.mfa_enabled)
-
-    if require_approval:
-        payload["kyc_status"] = "PENDING_APPROVAL"
-        payload["is_active"] = False
-        payload["access_level"] = AccessLevel.ELEVATED.value
-    else:
-        payload["kyc_status"] = user.kyc_status or "VERIFIED"
-        payload["is_active"] = True if user.is_active is None else bool(user.is_active)
-
-    if get_user(db, payload["user_id"]) is not None:
-        raise ValueError("User already exists")
-
-    db_user = User(**payload, password_hash=hash_password(user.password))
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
 
 
 def set_user_active(db: Session, user_id: str, is_active: bool) -> User | None:

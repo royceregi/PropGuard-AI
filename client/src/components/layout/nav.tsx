@@ -28,71 +28,75 @@ export const navItems: NavItem[] = [
     href: "/dashboard",
     label: "Dashboard",
     badge: null,
+    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
   },
   {
     id: "property_search",
     href: "/property-search",
     label: "Property Search",
     badge: null,
-    levels: ["SYSTEM", "REGISTRY", "COMPANY"],
+    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
   },
   {
     id: "transactions",
     href: "/transactions",
     label: "Transactions",
     badge: null,
+    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
   },
   {
     id: "blockchain_verification",
     href: "/blockchain-verification",
     label: "Blockchain Verification",
     badge: null,
+    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
   },
   {
     id: "ai_investigation",
     href: "/ai-investigation",
     label: "AI Investigation",
     badge: null,
-    levels: ["SYSTEM", "REGISTRY", "COMPANY"],
+    levels: ["SYSTEM", "REGISTRY", "COMPANY"]
   },
   {
     id: "risk_analysis",
     href: "/risk-analysis",
     label: "Risk Analysis",
     badge: null,
-    levels: ["SYSTEM", "REGISTRY", "COMPANY"],
+    levels: ["REGISTRY", "COMPANY", "PUBLIC"]
   },
   {
     id: "investigation_reports",
     href: "/investigation-reports",
     label: "Investigation Reports",
     badge: null,
+    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
   },
   {
     id: "audit_trail",
     href: "/audit-trail",
     label: "Audit Trail",
     badge: null,
-    levels: ["SYSTEM", "REGISTRY"],
+    levels: ["SYSTEM", "REGISTRY"]
   },
   {
     id: "users",
     href: "/users",
     label: "User Management",
     badge: null,
-    levels: ["SYSTEM", "REGISTRY", "COMPANY"],
+    levels: ["SYSTEM", "REGISTRY", "COMPANY"]
   },
   {
     id: "settings",
     href: "/settings",
     label: "Settings",
     badge: null,
-    levels: ["SYSTEM"],
-  },
+    levels: ["SYSTEM"]
+  }
 ];
 
 export function visibleNavItems(
-  accessLevel: AccessLevel | null | undefined,
+  accessLevel: AccessLevel | null | undefined
 ): NavItem[] {
   return navItems
     .filter((item) => {
@@ -106,13 +110,17 @@ export function visibleNavItems(
       accessLevel &&
       isOperationalAccessLevel(accessLevel)
         ? { ...item, href: homeForAccessLevel(accessLevel) }
-        : item,
+        : item
     );
 }
 
 export function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/dashboard")) {
     return "Dashboard";
+  }
+
+  if (pathname.startsWith("/profile")) {
+    return "Profile";
   }
 
   if (pathname.startsWith("/property-search/")) {
@@ -129,7 +137,7 @@ export function getPageTitle(pathname: string): string {
   }
 
   const nested = navItems.find(
-    (item) => item.href !== "/" && pathname.startsWith(item.href),
+    (item) => item.href !== "/" && pathname.startsWith(item.href)
   );
 
   return nested?.label ?? "Dashboard";

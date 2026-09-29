@@ -47,8 +47,11 @@ def read_user_stats(
 
 @router.get("/", response_model=List[User])
 def read_users(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    q: str | None = Query(None, max_length=120),
+    sort_by: str = Query("created_at", pattern="^(" + "|".join(user_repository.USER_SORT_COLUMNS) + ")$"),
+    sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
     actor: UserModel = Depends(require_roles(DIRECTORY_LEVELS)),
 ):
@@ -57,6 +60,9 @@ def read_users(
         skip=skip,
         limit=limit,
         actor_access_level=actor.access_level,
+        search=q,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
     )
 
 

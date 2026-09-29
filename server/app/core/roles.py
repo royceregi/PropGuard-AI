@@ -9,7 +9,7 @@ class AccessLevel(str, Enum):
     SYSTEM = "SYSTEM"  # Super Admin
     REGISTRY = "REGISTRY"  # Land Registry
     COMPANY = "COMPANY"  # Real Estate Company
-    PUBLIC = "PUBLIC"  # End user with system access (after admin approval)
+    PUBLIC = "PUBLIC"  # End user added by registry/company; read-only property access
     STANDARD = "STANDARD"  # End user in DB, no system access yet
     ELEVATED = "ELEVATED"  # Nominated by registry/company; awaiting super admin
 
@@ -43,7 +43,6 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "load_datasets",
         "view_system_health",
         "view_all_transactions",
-        "view_risk_assessments",
         "review_agent_logs",
         "configure_thresholds",
         "manage_verification_rules",
@@ -51,7 +50,6 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "alter_official_history",
         "search_properties",
         "run_verification",
-        "run_risk_analysis",
         "view_own_property",
         "view_audit_trail",
     ],
@@ -66,6 +64,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "view_blockchain_integrity",
         "resolve_flagged_cases",
         "review_risk_reports",
+        "process_risk_assessment_requests",
+        "send_risk_assessment_results",
         "mark_case_reviewed",
         "search_properties",
         "run_verification",
@@ -82,18 +82,22 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "check_encumbrances",
         "check_transaction_history",
         "submit_transaction_analysis",
+        "submit_risk_assessment_request",
         "view_risk_assessment",
         "run_verification",
-        "run_risk_analysis",
         "view_own_property",
     ],
     AccessLevel.PUBLIC.value: [
         "view_own_property",
         "view_own_history",
+        "view_shared_property",
+        "check_encumbrances",
         "check_own_verification",
         "view_transaction_status",
         "submit_inquiry",
-        "view_limited_public_property",
+        "submit_risk_assessment_request",
+        "view_risk_assessment",
+        "run_verification",
     ],
     AccessLevel.STANDARD.value: [
         "view_own_property",

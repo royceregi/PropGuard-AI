@@ -22,8 +22,8 @@ export function Toaster() {
           title: "text-sm font-medium",
           description: "text-xs",
           actionButton: "bg-primary text-text-inverse",
-          cancelButton: "bg-surface-subtle text-text-secondary",
-        },
+          cancelButton: "bg-surface-subtle text-text-secondary"
+        }
       }}
       style={
         {
@@ -42,7 +42,7 @@ export function Toaster() {
           "--warning-text": "var(--color-accent)",
           "--error-bg": "var(--color-critical-container)",
           "--error-border": "var(--color-danger)",
-          "--error-text": "var(--color-critical)",
+          "--error-text": "var(--color-critical)"
         } as CSSProperties
       }
     />

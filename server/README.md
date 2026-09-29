@@ -45,10 +45,10 @@ Demo logins (local only):
 
 | Access level | Email | Password |
 | --- | --- | --- |
-| SYSTEM | `maria.s@example.com` | `DemoAdmin#2026` |
-| REGISTRY | `ivan.p@example.net` | `DemoRegistry#2026` |
-| COMPANY | `george.a@example.org` | `DemoCompany#2026` |
-| PUBLIC | `bob.m@example.net` | `DemoPublic#2026` |
+| SYSTEM | `admin@prop.ai` | `DemoAdmin#2026` |
+| REGISTRY | `registry@prop.ai` | `DemoRegistry#2026` |
+| COMPANY | `estate@prop.ai` | `DemoCompany#2026` |
+| PUBLIC | `user@prop.ai` | `DemoPublic#2026` |
 
 ## Property view APIs (read-only)
 

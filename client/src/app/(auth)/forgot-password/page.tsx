@@ -1,12 +1,12 @@
 import {
   AuthBrandHeader,
   AuthSecurityBadge,
-  AuthShell,
+  AuthShell
 } from "@/components/auth/AuthShell";
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 
 export const metadata = {
-  title: "Forgot password · PROPERTYCHAIN AI",
+  title: "Forgot password · PROPERTYCHAIN AI"
 };
 
 export default function ForgotPasswordPage() {

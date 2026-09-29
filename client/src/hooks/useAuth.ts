@@ -21,7 +21,7 @@ export function useAuth() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload)
     });
 
     const data = (await response.json().catch(() => null)) as
@@ -43,7 +43,7 @@ export function useAuth() {
   async function logout() {
     await fetch("/api/auth/logout", {
       method: "POST",
-      credentials: "include",
+      credentials: "include"
     }).catch(() => undefined);
     clearSession();
   }
@@ -57,6 +57,6 @@ export function useAuth() {
     homePath:
       user && isOperationalAccessLevel(user.access_level)
         ? homeForAccessLevel(user.access_level)
-        : "/login",
+        : "/login"
   };
 }

@@ -53,7 +53,6 @@ import LocationOnOutlined from "@mui/icons-material/LocationOnOutlined";
 import LoginOutlined from "@mui/icons-material/LoginOutlined";
 import MailOutlined from "@mui/icons-material/MailOutlined";
 import MarkEmailReadOutlined from "@mui/icons-material/MarkEmailReadOutlined";
-import PersonAddOutlined from "@mui/icons-material/PersonAddOutlined";
 import PersonRemoveOutlined from "@mui/icons-material/PersonRemoveOutlined";
 import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
 import ReceiptOutlined from "@mui/icons-material/ReceiptOutlined";
@@ -120,7 +119,6 @@ export const LocationOnIcon = LocationOnOutlined;
 export const LoginIcon = LoginOutlined;
 export const MailIcon = MailOutlined;
 export const MarkEmailReadIcon = MarkEmailReadOutlined;
-export const PersonAddIcon = PersonAddOutlined;
 export const PersonRemoveIcon = PersonRemoveOutlined;
 export const ReceiptLongIcon = ReceiptLongOutlined;
 export const ReceiptIcon = ReceiptOutlined;
@@ -188,7 +186,6 @@ export const Icons = {
   Login: LoginIcon,
   Mail: MailIcon,
   MarkEmailRead: MarkEmailReadIcon,
-  PersonAdd: PersonAddIcon,
   PersonRemove: PersonRemoveIcon,
   ReceiptLong: ReceiptLongIcon,
   Receipt: ReceiptIcon,
@@ -199,7 +196,7 @@ export const Icons = {
   VisibilityOff: VisibilityOffIcon,
   OpenInNew: OpenInNewIcon,
   LockOpen: LockOpenIcon,
-  Sync: SyncIcon,
+  Sync: SyncIcon
 } as const;
 
 export type IconName = keyof typeof Icons;
@@ -214,5 +211,5 @@ export const navIcons: Record<NavItemId, (typeof Icons)[IconName]> = {
   investigation_reports: Icons.Assessment,
   audit_trail: Icons.History,
   users: Icons.ManageAccounts,
-  settings: Icons.Settings,
+  settings: Icons.Settings
 } as const;

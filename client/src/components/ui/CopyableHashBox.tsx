@@ -14,7 +14,7 @@ export function CopyableHashBox({
   value,
   displayValue,
   label,
-  className,
+  className
 }: CopyableHashBoxProps) {
   const [copied, setCopied] = useState(false);
   const shown = displayValue ?? value;

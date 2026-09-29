@@ -10,7 +10,7 @@ export function TransactionPreviewCard() {
         <Breadcrumbs
           items={[
             { label: "Transactions", href: "/transactions" },
-            { label: "TX-2023-10425" },
+            { label: "TX-2023-10425" }
           ]}
         />
         <div className="flex flex-wrap items-center gap-2">

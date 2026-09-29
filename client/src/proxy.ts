@@ -5,11 +5,11 @@ import {
   canAccessPath,
   homeForAccessLevel,
   isAuthPage,
-  isPublicPage,
+  isPublicPage
 } from "@/lib/auth/roles";
 import {
   isOperationalAccessLevel,
-  type OperationalAccessLevel,
+  type OperationalAccessLevel
 } from "@/lib/auth/types";
 
 interface AccessTokenPayload {
@@ -27,7 +27,7 @@ export function proxy(request: NextRequest) {
   if (isAuthPage(pathname)) {
     if (session) {
       return NextResponse.redirect(
-        new URL(homeForAccessLevel(session.accessLevel), request.url),
+        new URL(homeForAccessLevel(session.accessLevel), request.url)
       );
     }
     return NextResponse.next();
@@ -35,7 +35,7 @@ export function proxy(request: NextRequest) {
 
   if (pathname === "/dashboard" && session) {
     return NextResponse.redirect(
-      new URL(homeForAccessLevel(session.accessLevel), request.url),
+      new URL(homeForAccessLevel(session.accessLevel), request.url)
     );
   }
 
@@ -51,7 +51,7 @@ export function proxy(request: NextRequest) {
 
   if (!canAccessPath(pathname, session.accessLevel)) {
     return NextResponse.redirect(
-      new URL(homeForAccessLevel(session.accessLevel), request.url),
+      new URL(homeForAccessLevel(session.accessLevel), request.url)
     );
   }
 
@@ -61,11 +61,11 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"]
 };
 
 function readSession(
-  token: string | undefined,
+  token: string | undefined
 ): { accessLevel: OperationalAccessLevel } | null {
   if (!token) {
     return null;

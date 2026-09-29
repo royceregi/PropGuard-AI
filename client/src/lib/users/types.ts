@@ -26,7 +26,7 @@ export function formatDateTime(value: string | null | undefined): string {
   }
   return date.toLocaleString(undefined, {
     dateStyle: "medium",
-    timeStyle: "short",
+    timeStyle: "short"
   });
 }
 
@@ -81,7 +81,7 @@ export function kycLabel(status: string | null | undefined): string {
 }
 
 export function kycVariant(
-  status: string | null | undefined,
+  status: string | null | undefined
 ): "success" | "warning" | "error" | "neutral" | "info" {
   const label = kycLabel(status);
   if (label === "Approved") {
@@ -115,30 +115,27 @@ export const ASSIGNABLE_ACCESS_LEVELS = [
   "COMPANY",
   "PUBLIC",
   "STANDARD",
-  "ELEVATED",
+  "ELEVATED"
 ] as const;
 
 /** Levels super admin may assign on public/end-user accounts. */
 export const SYSTEM_END_USER_LEVELS = [
   "STANDARD",
   "PUBLIC",
-  "ELEVATED",
+  "ELEVATED"
 ] as const;
 
 /** Levels registry/company may toggle between (regular ↔ pending). */
-export const REGISTRY_COMPANY_TOGGLE_LEVELS = [
-  "STANDARD",
-  "ELEVATED",
-] as const;
+export const REGISTRY_COMPANY_TOGGLE_LEVELS = ["STANDARD", "ELEVATED"] as const;
 
 export function isPendingAccessLevel(
-  accessLevel: string | null | undefined,
+  accessLevel: string | null | undefined
 ): boolean {
   return (accessLevel || "").trim().toUpperCase() === "ELEVATED";
 }
 
 export function isRegularEndUserLevel(
-  accessLevel: string | null | undefined,
+  accessLevel: string | null | undefined
 ): boolean {
   const level = (accessLevel || "").trim().toUpperCase();
   return level === "STANDARD" || level === "PUBLIC";
@@ -155,6 +152,7 @@ export interface UserRelatedProperty {
   current_usage_type: string | null;
   verification_status: string | null;
   legal_status: string | null;
+  encumbrances?: string | null;
   current_owner_id: string | null;
   is_current_owner: boolean;
   in_ownership_history: boolean;
@@ -178,7 +176,7 @@ export function userProfileHref(
       }
     | null
     | undefined,
-  fallbackId?: string | null,
+  fallbackId?: string | null
 ): string | undefined {
   const username = user?.username?.trim();
   if (username) {

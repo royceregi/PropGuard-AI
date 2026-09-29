@@ -20,6 +20,7 @@ class LoginResponse(BaseModel):
 
 class CurrentUserResponse(UserPublic):
     username: str | None = None
+    phone_number: str | None = None
     nic_hash: str | None = None
     kyc_status: str | None = None
     mfa_enabled: bool = False
@@ -28,3 +29,17 @@ class CurrentUserResponse(UserPublic):
     permissions: list[str] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProfileUpdateRequest(BaseModel):
+    full_name: str | None = Field(default=None, max_length=255)
+    phone_number: str | None = Field(default=None, max_length=50)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=8, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class MessageResponse(BaseModel):
+    detail: str

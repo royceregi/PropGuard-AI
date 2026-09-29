@@ -9,7 +9,7 @@ import { useAuthStore } from "@/lib/auth/store";
 export function SideNav({
   open,
   collapsed,
-  onClose,
+  onClose
 }: {
   open: boolean;
   collapsed: boolean;

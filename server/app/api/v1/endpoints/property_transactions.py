@@ -7,6 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.api.property_access import (
+    ensure_property_access,
+    ensure_transaction_access,
+    scoped_property_ids,
+)
 from app.core.database import get_db
 from app.models.user import User as UserModel
 from app.repositories import property_repository
@@ -17,7 +22,7 @@ from app.schemas.property import (
 
 router = APIRouter()
 
-VIEW_ROLES = ["SYSTEM", "REGISTRY", "COMPANY"]
+VIEW_ROLES = ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
 
 
 @router.get("/", response_model=PaginatedPropertyTransactions)
@@ -37,8 +42,12 @@ def list_transactions(
     min_value: Decimal | None = None,
     max_value: Decimal | None = None,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    allowed_ids = scoped_property_ids(db, current_user)
+    if property_id:
+        ensure_property_access(db, current_user, property_id)
+
     items, total = property_repository.list_transactions(
         db,
         skip=skip,
@@ -55,6 +64,7 @@ def list_transactions(
         date_to=date_to,
         min_value=min_value,
         max_value=max_value,
+        property_ids=allowed_ids,
     )
     return PaginatedPropertyTransactions(
         items=property_repository.enrich_transactions(db, items),
@@ -68,8 +78,9 @@ def list_transactions(
 def get_transaction(
     transaction_id: str,
     db: Session = Depends(get_db),
-    _: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    ensure_transaction_access(db, current_user, transaction_id)
     detail = property_repository.get_transaction_detail(db, transaction_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Transaction not found")

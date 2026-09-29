@@ -18,12 +18,12 @@ const variantClass: Record<StatusBadgeVariant, string> = {
   info: "border-primary-subtle-alt bg-primary-subtle text-primary",
   warning: "border-accent-container-alt bg-accent-container text-accent",
   error: "border-danger/40 bg-critical-container text-critical",
-  neutral: "border-border-subtle bg-surface-subtle text-text-secondary",
+  neutral: "border-border-subtle bg-surface-subtle text-text-secondary"
 };
 
 const sizeClass: Record<StatusBadgeSize, string> = {
   sm: "px-2 py-0.5 text-[11px]",
-  md: "px-2.5 py-0.5 text-xs",
+  md: "px-2.5 py-0.5 text-xs"
 };
 
 export function StatusBadge({
@@ -31,7 +31,7 @@ export function StatusBadge({
   variant = "info",
   icon,
   size = "md",
-  className,
+  className
 }: StatusBadgeProps) {
   return (
     <span

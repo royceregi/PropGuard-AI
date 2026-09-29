@@ -17,7 +17,7 @@ import {
   shortenHash,
   type ManagedUser,
   type PaginatedUserRelatedProperties,
-  type UserRelatedProperty,
+  type UserRelatedProperty
 } from "@/lib/users/types";
 import { propertyHref, shortenId } from "@/lib/property-search/types";
 
@@ -53,7 +53,7 @@ export function UserDetailsView({ username }: { username: string }) {
 
       try {
         const { data } = await api.get<ManagedUser>(
-          `/api/v1/users/by-username/${encoded}`,
+          `/api/v1/users/by-username/${encoded}`
         );
         return data;
       } catch (err) {
@@ -62,7 +62,7 @@ export function UserDetailsView({ username }: { username: string }) {
             ? identifier.toUpperCase()
             : identifier;
           const { data } = await api.get<ManagedUser>(
-            `/api/v1/users/${encodeURIComponent(asUserId)}`,
+            `/api/v1/users/${encodeURIComponent(asUserId)}`
           );
           return data;
         }
@@ -86,7 +86,7 @@ export function UserDetailsView({ username }: { username: string }) {
           const propertiesResponse =
             await api.get<PaginatedUserRelatedProperties>(
               `/api/v1/users/${encodeURIComponent(data.user_id)}/properties`,
-              { params: { skip: 0, limit: 100 } },
+              { params: { skip: 0, limit: 100 } }
             );
           if (!cancelled) {
             setProperties(propertiesResponse.data.items);
@@ -128,7 +128,7 @@ export function UserDetailsView({ username }: { username: string }) {
     if (
       !nextActive &&
       !window.confirm(
-        `Deactivate ${user.full_name?.trim() || user.user_id}?\n\nThey will not be able to sign in until activated again.`,
+        `Deactivate ${user.full_name?.trim() || user.user_id}?\n\nThey will not be able to sign in until activated again.`
       )
     ) {
       return;
@@ -138,18 +138,18 @@ export function UserDetailsView({ username }: { username: string }) {
     try {
       const { data } = await api.patch<ManagedUser>(
         `/api/v1/users/${encodeURIComponent(user.user_id)}/active`,
-        { is_active: nextActive },
+        { is_active: nextActive }
       );
       setUser(data);
       toast.success(
-        nextActive ? "User admitted to system" : "User deactivated",
+        nextActive ? "User admitted to system" : "User deactivated"
       );
     } catch (err) {
       toast.error("Unable to update account status", {
         description:
           isAxiosError(err) && typeof err.response?.data?.detail === "string"
             ? err.response.data.detail
-            : "Please try again.",
+            : "Please try again."
       });
     } finally {
       setStatusBusy(false);
@@ -167,18 +167,18 @@ export function UserDetailsView({ username }: { username: string }) {
     try {
       const { data } = await api.patch<ManagedUser>(
         `/api/v1/users/${encodeURIComponent(user.user_id)}/access-level`,
-        { access_level: accessLevel },
+        { access_level: accessLevel }
       );
       setUser(data);
       toast.success("Access updated", {
-        description: labelForAccessLevel(data.access_level),
+        description: labelForAccessLevel(data.access_level)
       });
     } catch (err) {
       toast.error("Unable to update access", {
         description:
           isAxiosError(err) && typeof err.response?.data?.detail === "string"
             ? err.response.data.detail
-            : "Please try again.",
+            : "Please try again."
       });
     } finally {
       setLevelBusy(false);
@@ -198,7 +198,7 @@ export function UserDetailsView({ username }: { username: string }) {
     if (
       submitForApproval &&
       !window.confirm(
-        `Submit ${user.full_name?.trim() || user.user_id} for Super Admin approval?\n\nThis sets the account to Pending until Super Admin promotes them to Public.`,
+        `Submit ${user.full_name?.trim() || user.user_id} for Super Admin approval?\n\nThis sets the account to Pending until Super Admin promotes them to Public.`
       )
     ) {
       return;
@@ -234,7 +234,7 @@ export function UserDetailsView({ username }: { username: string }) {
   const level = (user.access_level || "").toUpperCase();
   const pending = isPendingAccessLevel(user.access_level);
   const selectValue = SYSTEM_END_USER_LEVELS.includes(
-    level as (typeof SYSTEM_END_USER_LEVELS)[number],
+    level as (typeof SYSTEM_END_USER_LEVELS)[number]
   )
     ? level
     : level || "STANDARD";
@@ -295,7 +295,7 @@ export function UserDetailsView({ username }: { username: string }) {
               className="h-9 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-text-primary outline-none focus:border-primary"
             >
               {!SYSTEM_END_USER_LEVELS.includes(
-                selectValue as (typeof SYSTEM_END_USER_LEVELS)[number],
+                selectValue as (typeof SYSTEM_END_USER_LEVELS)[number]
               ) ? (
                 <option value={selectValue}>
                   {labelForAccessLevel(selectValue)}
@@ -365,10 +365,7 @@ export function UserDetailsView({ username }: { username: string }) {
           label="Account Status"
           value={user.is_active ? "Active" : "Inactive"}
         />
-        <Field
-          label="MFA"
-          value={user.mfa_enabled ? "Enabled" : "Disabled"}
-        />
+        <Field label="MFA" value={user.mfa_enabled ? "Enabled" : "Disabled"} />
         <Field label="KYC Status" value={user.kyc_status} />
       </ProfileSection>
 
@@ -423,7 +420,11 @@ export function UserDetailsView({ username }: { username: string }) {
                 property.property_name?.trim() ||
                 property.title_deed_number?.trim() ||
                 shortenId(property.property_id, 8, 6);
-              const location = [property.address, property.district, property.city]
+              const location = [
+                property.address,
+                property.district,
+                property.city
+              ]
                 .map((part) => part?.trim())
                 .filter(Boolean)
                 .join(", ");
@@ -500,7 +501,7 @@ export function UserDetailsView({ username }: { username: string }) {
 
 function ProfileSection({
   title,
-  children,
+  children
 }: {
   title: string;
   children: ReactNode;
@@ -521,7 +522,7 @@ function Field({
   displayValue,
   mono,
   full,
-  className,
+  className
 }: {
   label: string;
   value: string | null | undefined;
