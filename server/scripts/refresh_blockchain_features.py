@@ -17,9 +17,13 @@ from app.services import blockchain_risk_service
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     scope = parser.add_mutually_exclusive_group(required=True)
-    scope.add_argument("--limit", type=int, help="Refresh the N least recently checked transactions")
+    scope.add_argument(
+        "--limit", type=int, help="Refresh the N least recently checked transactions"
+    )
     scope.add_argument("--property", help="Refresh every transaction of one property")
     scope.add_argument("--all", action="store_true", help="Refresh every ledger transaction")
     args = parser.parse_args()

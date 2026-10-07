@@ -9,12 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from sqlalchemy.orm import Session
-
 from app.core.database import SessionLocal
 from app.core.roles import AccessLevel
 from app.core.security import hash_nic, hash_password
 from app.models.user import User
+from sqlalchemy.orm import Session
 
 DEMO_USERS = (
     {
@@ -72,11 +71,7 @@ def upsert_demo_users(db: Session) -> None:
     for row in DEMO_USERS:
         password = row["password"]
         nic = row["nic"]
-        payload = {
-            key: value
-            for key, value in row.items()
-            if key not in {"password", "nic"}
-        }
+        payload = {key: value for key, value in row.items() if key not in {"password", "nic"}}
         payload["email"] = str(payload["email"]).strip().lower()
         payload["nic_hash"] = hash_nic(str(nic))
         payload["password_hash"] = hash_password(str(password))

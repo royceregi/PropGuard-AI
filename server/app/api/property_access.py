@@ -47,9 +47,7 @@ def ensure_property_access(db: Session, user: UserModel, property_id: str) -> No
     raise HTTPException(status_code=404, detail="Property not found")
 
 
-def ensure_transaction_access(
-    db: Session, user: UserModel, transaction_id: str
-) -> None:
+def ensure_transaction_access(db: Session, user: UserModel, transaction_id: str) -> None:
     if is_authority_viewer(user):
         return
     if is_public_viewer(user) and property_repository.user_can_access_transaction(

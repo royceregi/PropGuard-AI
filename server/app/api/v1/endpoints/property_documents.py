@@ -46,9 +46,7 @@ def list_documents(
         verification_status=verification_status,
         property_ids=allowed_ids,
     )
-    return PaginatedPropertyDocuments(
-        items=items, total=total, skip=skip, limit=limit
-    )
+    return PaginatedPropertyDocuments(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get("/{document_id}", response_model=PropertyDocumentRead)

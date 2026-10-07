@@ -35,7 +35,9 @@ def run(
             db, evaluation["transaction_id"], evaluation=evaluation
         )
     except Exception as exc:
-        log_run(db, AGENT_NAME, input_data=input_data, output=None, started_at=started, error=str(exc))
+        log_run(
+            db, AGENT_NAME, input_data=input_data, output=None, started_at=started, error=str(exc)
+        )
         raise
 
     warnings = list(retrieval_output["warnings"])

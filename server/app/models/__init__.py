@@ -1,4 +1,5 @@
-from app.models.user import User
+from app.core.database import Base
+from app.models.notification import Notification
 from app.models.property import (
     BlockchainTransaction,
     Property,
@@ -9,6 +10,7 @@ from app.models.property import (
     RegistrationDetail,
     TransactionParty,
 )
+from app.models.retrieval import QueryLog, QueryRetrieval
 from app.models.risk_assessment import (
     AgentRun,
     RiskAssessment,
@@ -16,7 +18,7 @@ from app.models.risk_assessment import (
     RiskIndicator,
     TransactionFeature,
 )
-from app.core.database import Base
+from app.models.user import User
 
 __all__ = [
     "Base",
@@ -34,4 +36,7 @@ __all__ = [
     "RiskAssessment",
     "RiskIndicator",
     "AgentRun",
+    "QueryLog",
+    "QueryRetrieval",
+    "Notification",
 ]

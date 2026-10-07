@@ -176,6 +176,22 @@ class PropertySnapshot(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
+class PropertyShare(Base):
+    """Seller -> Buyer explicit property access share (Phase 8a)."""
+
+    __tablename__ = "property_shares"
+    __table_args__ = {"schema": "core"}
+
+    share_id = Column(String(36), primary_key=True)
+    property_id = Column(Text, nullable=False, index=True)
+    owner_user_id = Column(Text, nullable=False, index=True)
+    buyer_user_id = Column(Text, nullable=False, index=True)
+    notes = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+    expires_at = Column(DateTime)
+    revoked_at = Column(DateTime)
+
+
 __all__ = [
     "Property",
     "PropertyDocument",
@@ -185,4 +201,5 @@ __all__ = [
     "BlockchainTransaction",
     "PropertySnapshot",
     "RegistrationDetail",
+    "PropertyShare",
 ]

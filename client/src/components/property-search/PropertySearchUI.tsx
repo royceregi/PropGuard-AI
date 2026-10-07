@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { isAxiosError } from "axios";
 import { PropertyFilters } from "@/components/property-search/PropertyFilters";
 import { PropertyResults } from "@/components/property-search/PropertyResults";
+import { RetrievalUI } from "@/components/retrieval/RetrievalUI";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api/client";
 import {
@@ -15,9 +16,12 @@ import {
   type PropertySearchFilters
 } from "@/lib/property-search/types";
 
+type Tab = "properties" | "retrieval";
+
 export function PropertySearchUI() {
   const { user } = useAuth();
   const isPublicUser = user?.access_level === "PUBLIC";
+  const [activeTab, setActiveTab] = useState<Tab>("properties");
   const [filters, setFilters] = useState<PropertySearchFilters>(
     EMPTY_PROPERTY_SEARCH_FILTERS
   );
@@ -60,11 +64,13 @@ export function PropertySearchUI() {
       }
     }
 
-    void fetchProperties();
+    if (activeTab === "properties") {
+      void fetchProperties();
+    }
     return () => {
       cancelled = true;
     };
-  }, [filters, page]);
+  }, [filters, page, activeTab]);
 
   function handleSubmit(nextFilters: PropertySearchFilters) {
     setLoading(true);
@@ -87,28 +93,57 @@ export function PropertySearchUI() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-full flex-col gap-6 p-3 sm:p-4 lg:p-6 xl:p-8">
-      {isPublicUser ? (
-        <p className="rounded-lg border border-border-subtle bg-surface-subtle px-4 py-3 text-sm text-text-secondary">
-          Showing only properties you own or that were shared with you on a
-          transaction. Unrelated properties are not available.
-        </p>
-      ) : null}
-      <PropertyFilters
-        initialValues={filters}
-        loading={loading}
-        onSubmit={handleSubmit}
-        onClear={handleClear}
-      />
-      <PropertyResults
-        items={items}
-        total={total}
-        page={page}
-        pageSize={PROPERTY_PAGE_SIZE}
-        loading={loading}
-        error={error}
-        onPageChange={handlePageChange}
-      />
+    <div className="mx-auto flex w-full max-w-full flex-col gap-4 p-3 sm:p-4 lg:p-6 xl:p-8">
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-border">
+        {(
+          [
+            { id: "properties" as Tab, label: "Property Filters" },
+            { id: "retrieval" as Tab, label: "Evidence Retrieval" }
+          ] as const
+        ).map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setActiveTab(id)}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === id
+                ? "border-b-2 border-primary text-primary"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "properties" && (
+        <>
+          {isPublicUser ? (
+            <p className="rounded-lg border border-border-subtle bg-surface-subtle px-4 py-3 text-sm text-text-secondary">
+              Showing only properties you own or that were shared with you on a
+              transaction. Unrelated properties are not available.
+            </p>
+          ) : null}
+          <PropertyFilters
+            initialValues={filters}
+            loading={loading}
+            onSubmit={handleSubmit}
+            onClear={handleClear}
+          />
+          <PropertyResults
+            items={items}
+            total={total}
+            page={page}
+            pageSize={PROPERTY_PAGE_SIZE}
+            loading={loading}
+            error={error}
+            onPageChange={handlePageChange}
+          />
+        </>
+      )}
+
+      {activeTab === "retrieval" && <RetrievalUI />}
     </div>
   );
 }

@@ -99,7 +99,12 @@ _REGISTRY_RULES: dict[str, tuple[str, str, float, float]] = {
     "PROPERTY_CONSISTENT": ("LEDGER_PROPERTY_MISMATCH", "Ledger property mismatch", 0.4, 0.0),
     "VALUE_MATCH": ("BLOCKCHAIN_VALUE_MISMATCH", "Ledger value mismatch", 0.3, 0.0),
     "TYPE_CONSISTENT": ("BLOCKCHAIN_TYPE_MISMATCH", "Ledger type mismatch", 0.2, 0.0),
-    "TIMESTAMP_TOLERANCE": ("BLOCKCHAIN_TIMESTAMP_MISMATCH", "Ledger timestamp mismatch", 0.15, 0.0),
+    "TIMESTAMP_TOLERANCE": (
+        "BLOCKCHAIN_TIMESTAMP_MISMATCH",
+        "Ledger timestamp mismatch",
+        0.15,
+        0.0,
+    ),
     "LEDGER_CONFIRMED": ("UNCONFIRMED_BLOCKCHAIN_TX", "Ledger transaction not confirmed", 0.3, 0.1),
     "SELLER_WALLET": ("SELLER_WALLET_MISMATCH", "Seller wallet mismatch", 0.3, 0.0),
     "BUYER_WALLET": ("BUYER_WALLET_MISMATCH", "Buyer wallet mismatch", 0.3, 0.0),
@@ -108,7 +113,12 @@ _REGISTRY_RULES: dict[str, tuple[str, str, float, float]] = {
     # Kept low: in this synthetic dataset the seller is rarely the earlier owner of record.
     "SELLER_WAS_OWNER": ("SELLER_NOT_CURRENT_OWNER", "Seller was not the owner", 0.15, 0.0),
     "SINGLE_ACTIVE_OWNER": ("MULTIPLE_ACTIVE_OWNERS", "Conflicting active owners", 0.3, 0.0),
-    "CURRENT_OWNER_CONSISTENT": ("OWNER_RECORD_INCONSISTENT", "Owner record inconsistent", 0.1, 0.05),
+    "CURRENT_OWNER_CONSISTENT": (
+        "OWNER_RECORD_INCONSISTENT",
+        "Owner record inconsistent",
+        0.1,
+        0.05,
+    ),
     "ENCUMBRANCE": ("ACTIVE_ENCUMBRANCE", "Active encumbrance", 0.3, 0.1),
     "REGISTRATION": ("REGISTRATION_ISSUE", "Registration issue", 0.3, 0.1),
 }
@@ -179,45 +189,107 @@ def _integrity_indicators(verify: dict[str, Any]) -> list[dict[str, Any]]:
 
     def add(key: str, evidence: list[dict[str, Any]]) -> None:
         code, name, weight, description = _INTEGRITY_RULES[key]
-        found.append(_indicator(code, name, weight, description, evidence, "blockchain_verification"))
+        found.append(
+            _indicator(code, name, weight, description, evidence, "blockchain_verification")
+        )
 
     chain_evidence = []
     if not verify["previous_hash_match"]:
-        chain_evidence.append({**ledger, "field": "previous_hash", "expected": d["expected_previous_hash"],
-                               "actual": d["previous_hash"]})
+        chain_evidence.append(
+            {
+                **ledger,
+                "field": "previous_hash",
+                "expected": d["expected_previous_hash"],
+                "actual": d["previous_hash"],
+            }
+        )
     if not verify["tx_hash_match"]:
-        chain_evidence.append({**ledger, "field": "tx_hash", "expected": d["recomputed_tx_hash"],
-                               "actual": d["tx_hash"]})
+        chain_evidence.append(
+            {
+                **ledger,
+                "field": "tx_hash",
+                "expected": d["recomputed_tx_hash"],
+                "actual": d["tx_hash"],
+            }
+        )
     if chain_evidence:
         add("chain", chain_evidence)
     if not verify["transaction_data_hash_match"]:
-        add("transaction", [{**ledger, "field": "transaction_data_hash",
-                             "expected": d["recomputed_transaction_data_hash"],
-                             "actual": d["transaction_data_hash"]}])
+        add(
+            "transaction",
+            [
+                {
+                    **ledger,
+                    "field": "transaction_data_hash",
+                    "expected": d["recomputed_transaction_data_hash"],
+                    "actual": d["transaction_data_hash"],
+                }
+            ],
+        )
     if not verify["property_hash_match"]:
         changes = d.get("property_changes") or []
         evidence = [
-            {"table": "properties", "id": d["property_id"], "field": c["field"],
-             "expected": _jsonable(c["anchored"]), "actual": _jsonable(c["current"])}
+            {
+                "table": "properties",
+                "id": d["property_id"],
+                "field": c["field"],
+                "expected": _jsonable(c["anchored"]),
+                "actual": _jsonable(c["current"]),
+            }
             for c in changes
-        ] or [{**ledger, "field": "property_hash", "expected": d["recomputed_property_hash"],
-               "actual": d["property_hash"]}]
+        ] or [
+            {
+                **ledger,
+                "field": "property_hash",
+                "expected": d["recomputed_property_hash"],
+                "actual": d["property_hash"],
+            }
+        ]
         add("property", evidence)
     if not verify["document_hash_match"]:
-        add("document", [
-            {"table": "property_documents", "id": str(doc["document_id"]), "field": "document_hash",
-             "expected": doc["recomputed_document_hash"], "actual": doc["document_hash"]}
-            for doc in d.get("documents") or [] if doc["match"] is False
-        ])
+        add(
+            "document",
+            [
+                {
+                    "table": "property_documents",
+                    "id": str(doc["document_id"]),
+                    "field": "document_hash",
+                    "expected": doc["recomputed_document_hash"],
+                    "actual": doc["document_hash"],
+                }
+                for doc in d.get("documents") or []
+                if doc["match"] is False
+            ],
+        )
     if verify["digital_signature_valid"] is False:
-        add("signature", [{**ledger, "field": "digital_signature", "expected": "valid registry signature",
-                           "actual": d.get("digital_signature")}])
+        add(
+            "signature",
+            [
+                {
+                    **ledger,
+                    "field": "digital_signature",
+                    "expected": "valid registry signature",
+                    "actual": d.get("digital_signature"),
+                }
+            ],
+        )
     if not verify["smart_contract_valid"]:
-        add("contract", [{**ledger, "field": "smart_contract_address",
-                          "expected": d.get("expected_smart_contract_address"),
-                          "actual": d.get("smart_contract_address")}])
+        add(
+            "contract",
+            [
+                {
+                    **ledger,
+                    "field": "smart_contract_address",
+                    "expected": d.get("expected_smart_contract_address"),
+                    "actual": d.get("smart_contract_address"),
+                }
+            ],
+        )
     if verify["duplicate_tx_hash"]:
-        add("duplicate", [{**ledger, "field": "tx_hash", "expected": "unique", "actual": d["tx_hash"]}])
+        add(
+            "duplicate",
+            [{**ledger, "field": "tx_hash", "expected": "unique", "actual": d["tx_hash"]}],
+        )
     return found
 
 
@@ -232,11 +304,21 @@ def _registry_indicators(checks: dict[str, Any]) -> list[dict[str, Any]]:
         if weight <= 0:
             continue
         evidence = [
-            {**ev, "field": check["code"], "expected": _jsonable(check.get("expected")),
-             "actual": _jsonable(check.get("actual"))}
+            {
+                **ev,
+                "field": check["code"],
+                "expected": _jsonable(check.get("expected")),
+                "actual": _jsonable(check.get("actual")),
+            }
             for ev in check.get("evidence") or []
-        ] or [{"table": "registry_checks", "id": check["code"],
-               "expected": _jsonable(check.get("expected")), "actual": _jsonable(check.get("actual"))}]
+        ] or [
+            {
+                "table": "registry_checks",
+                "id": check["code"],
+                "expected": _jsonable(check.get("expected")),
+                "actual": _jsonable(check.get("actual")),
+            }
+        ]
         found.append(_indicator(code, name, weight, check["reason"], evidence, "registry_checks"))
     return found
 
@@ -331,7 +413,9 @@ def _explanation(evaluation: dict[str, Any]) -> str:
     )
     if not indicators:
         return head + " No blockchain or registry issues found."
-    reasons = "; ".join(f"{item['indicator_code']}: {item['description']}" for item in indicators[:5])
+    reasons = "; ".join(
+        f"{item['indicator_code']}: {item['description']}" for item in indicators[:5]
+    )
     return f"{head} {reasons} This is a risk indicator, not a legal fraud judgment."
 
 
@@ -399,9 +483,17 @@ def _serialize_evaluation(evaluation: dict[str, Any]) -> dict[str, Any]:
         "explanation": _explanation(evaluation),
         "created_at": None,
         "indicators": [
-            {key: item[key] for key in (
-                "indicator_code", "indicator_name", "indicator_value", "severity", "description", "evidence"
-            )}
+            {
+                key: item[key]
+                for key in (
+                    "indicator_code",
+                    "indicator_name",
+                    "indicator_value",
+                    "severity",
+                    "description",
+                    "evidence",
+                )
+            }
             for item in evaluation["indicators"]
         ],
     }
@@ -458,12 +550,16 @@ def get_latest_assessment(db: Session, transaction_id: str) -> dict[str, Any] | 
         "explanation": assessment.explanation,
         "review_status": assessment.review_status,
         "created_at": assessment.created_at,
-        "features": {column: getattr(features, column) for column in FEATURE_COLUMNS} if features else None,
+        "features": {column: getattr(features, column) for column in FEATURE_COLUMNS}
+        if features
+        else None,
         "indicators": [
             {
                 "indicator_code": item.indicator_code,
                 "indicator_name": item.indicator_name,
-                "indicator_value": float(item.indicator_value) if item.indicator_value is not None else None,
+                "indicator_value": float(item.indicator_value)
+                if item.indicator_value is not None
+                else None,
                 "severity": item.severity,
                 "description": item.description,
                 "evidence": _parse_evidence(item.evidence_reference),
@@ -510,3 +606,28 @@ def ensure_feature_columns(conn: Any) -> None:
     }
     clauses = ", ".join(f"ADD COLUMN IF NOT EXISTS {name} {kind}" for name, kind in columns.items())
     conn.execute(text(f"ALTER TABLE core.transaction_features {clauses}"))
+
+
+def _anomaly_indicators(transaction_id: str, result: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not result or not result.get("is_anomaly"):
+        return []
+    from app.services import anomaly_model_service
+
+    ind = anomaly_model_service.indicator(transaction_id, result)
+    return [
+        {
+            "indicator_code": ind["code"],
+            "indicator_name": ind["name"],
+            "indicator_value": ind["weight"],
+            "severity": "MEDIUM",
+            "description": ind["description"],
+            "source": "anomaly_model",
+            "evidence": ind["evidence"],
+        }
+    ]
+
+
+def _model_version(result: dict[str, Any] | None) -> str:
+    if not result:
+        return MODEL_VERSION
+    return f"{MODEL_VERSION}+{result.get('model_name', 'anomaly')}-{result.get('model_version', '1.0')}"

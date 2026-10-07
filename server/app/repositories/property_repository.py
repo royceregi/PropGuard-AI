@@ -10,6 +10,7 @@ from app.models.property import (
     Property,
     PropertyDocument,
     PropertyOwnershipHistory,
+    PropertyShare,
     PropertyTransaction,
     TransactionParty,
 )
@@ -29,24 +30,38 @@ def get_property(db: Session, property_id: str) -> Property | None:
     return db.query(Property).filter(Property.property_id == property_id).first()
 
 
+def active_shared_property_ids_for_user(db: Session, user_id: str) -> set[str]:
+    """Property IDs explicitly shared with this buyer user (Phase 8a)."""
+    if not user_id:
+        return set()
+    now = func.now()
+    rows = (
+        db.query(PropertyShare.property_id)
+        .filter(
+            PropertyShare.buyer_user_id == user_id,
+            PropertyShare.revoked_at.is_(None),
+            or_(PropertyShare.expires_at.is_(None), PropertyShare.expires_at > now),
+        )
+        .all()
+    )
+    return {row[0] for row in rows if row[0]}
+
+
 def accessible_property_ids_for_user(db: Session, user_id: str) -> set[str]:
-    """Owned, ownership-history, or transaction-party (shared) property IDs."""
+    """Owned, ownership-history, transaction-party, or explicitly shared property IDs."""
     owned_ids, history_ids, party_ids = property_access_sets(db, user_id)
-    return owned_ids | history_ids | party_ids
+    shared_ids = active_shared_property_ids_for_user(db, user_id)
+    return owned_ids | history_ids | party_ids | shared_ids
 
 
-def property_access_sets(
-    db: Session, user_id: str
-) -> tuple[set[str], set[str], set[str]]:
+def property_access_sets(db: Session, user_id: str) -> tuple[set[str], set[str], set[str]]:
     """(current-owner IDs, ownership-history IDs, transaction-party IDs) for a user."""
     if not user_id:
         return set(), set(), set()
 
     owned_ids = {
         row[0]
-        for row in db.query(Property.property_id)
-        .filter(Property.current_owner_id == user_id)
-        .all()
+        for row in db.query(Property.property_id).filter(Property.current_owner_id == user_id).all()
         if row[0]
     }
     history_ids = {
@@ -105,12 +120,24 @@ def user_can_access_property(db: Session, user_id: str, property_id: str) -> boo
         )
         .first()
     )
-    return party_hit is not None
+    if party_hit is not None:
+        return True
+
+    now = func.now()
+    share_hit = (
+        db.query(PropertyShare.share_id)
+        .filter(
+            PropertyShare.property_id == property_id,
+            PropertyShare.buyer_user_id == user_id,
+            PropertyShare.revoked_at.is_(None),
+            or_(PropertyShare.expires_at.is_(None), PropertyShare.expires_at > now),
+        )
+        .first()
+    )
+    return share_hit is not None
 
 
-def user_can_access_transaction(
-    db: Session, user_id: str, transaction_id: str
-) -> bool:
+def user_can_access_transaction(db: Session, user_id: str, transaction_id: str) -> bool:
     if not user_id or not transaction_id:
         return False
 
@@ -173,9 +200,7 @@ def list_properties(
     if usage_type:
         query = query.filter(Property.current_usage_type.ilike(usage_type.strip()))
     if verification_status:
-        query = query.filter(
-            Property.verification_status.ilike(verification_status.strip())
-        )
+        query = query.filter(Property.verification_status.ilike(verification_status.strip()))
     if legal_status:
         query = query.filter(Property.legal_status.ilike(legal_status.strip()))
 
@@ -190,11 +215,7 @@ def list_properties(
 
 
 def get_document(db: Session, document_id: int) -> PropertyDocument | None:
-    return (
-        db.query(PropertyDocument)
-        .filter(PropertyDocument.document_id == document_id)
-        .first()
-    )
+    return db.query(PropertyDocument).filter(PropertyDocument.document_id == document_id).first()
 
 
 def list_documents(
@@ -219,9 +240,7 @@ def list_documents(
     if transaction_id:
         query = query.filter(PropertyDocument.transaction_id == transaction_id)
     if document_type:
-        query = query.filter(
-            PropertyDocument.document_type.ilike(document_type.strip())
-        )
+        query = query.filter(PropertyDocument.document_type.ilike(document_type.strip()))
     if verification_status:
         query = query.filter(
             PropertyDocument.verification_status.ilike(verification_status.strip())
@@ -279,10 +298,7 @@ def list_ownership_history(
             PropertyOwnershipHistory.ownership_status.ilike("ACTIVE"),
         )
 
-    total = (
-        query.with_entities(func.count(PropertyOwnershipHistory.ownership_id)).scalar()
-        or 0
-    )
+    total = query.with_entities(func.count(PropertyOwnershipHistory.ownership_id)).scalar() or 0
     items = (
         query.order_by(
             PropertyOwnershipHistory.ownership_start_date.desc().nullslast(),
@@ -337,27 +353,17 @@ def list_transactions(
     if status:
         query = query.filter(PropertyTransaction.status.ilike(status.strip()))
     if registration_type:
-        query = query.filter(
-            PropertyTransaction.registration_type.ilike(registration_type.strip())
-        )
+        query = query.filter(PropertyTransaction.registration_type.ilike(registration_type.strip()))
     if transaction_group:
-        query = query.filter(
-            PropertyTransaction.transaction_group.ilike(transaction_group.strip())
-        )
+        query = query.filter(PropertyTransaction.transaction_group.ilike(transaction_group.strip()))
     if area_name:
         query = query.filter(PropertyTransaction.area_name.ilike(area_name.strip()))
     if project_name:
-        query = query.filter(
-            PropertyTransaction.project_name.ilike(f"%{project_name.strip()}%")
-        )
+        query = query.filter(PropertyTransaction.project_name.ilike(f"%{project_name.strip()}%"))
     if date_from:
-        query = query.filter(
-            func.date(PropertyTransaction.transaction_datetime) >= date_from
-        )
+        query = query.filter(func.date(PropertyTransaction.transaction_datetime) >= date_from)
     if date_to:
-        query = query.filter(
-            func.date(PropertyTransaction.transaction_datetime) <= date_to
-        )
+        query = query.filter(func.date(PropertyTransaction.transaction_datetime) <= date_to)
     if min_value is not None:
         query = query.filter(PropertyTransaction.transaction_value >= min_value)
     if max_value is not None:
@@ -376,10 +382,7 @@ def list_transactions(
             )
         )
 
-    total = (
-        query.with_entities(func.count(PropertyTransaction.transaction_id)).scalar()
-        or 0
-    )
+    total = query.with_entities(func.count(PropertyTransaction.transaction_id)).scalar() or 0
     items = (
         query.order_by(
             PropertyTransaction.transaction_datetime.desc().nullslast(),
@@ -405,9 +408,7 @@ def get_linked_user(db: Session, user_id: str | None) -> LinkedUserSummary | Non
     return _user_summary(user)
 
 
-def get_users_by_ids(
-    db: Session, user_ids: list[str] | set[str]
-) -> dict[str, LinkedUserSummary]:
+def get_users_by_ids(db: Session, user_ids: list[str] | set[str]) -> dict[str, LinkedUserSummary]:
     ids = [uid for uid in {*(user_ids or [])} if uid]
     if not ids:
         return {}
@@ -419,16 +420,10 @@ def _normalize_role(role: str | None) -> str:
     return (role or "").strip().upper()
 
 
-def _pick_party(
-    parties: list[TransactionPartyRead], *roles: str
-) -> TransactionPartyRead | None:
+def _pick_party(parties: list[TransactionPartyRead], *roles: str) -> TransactionPartyRead | None:
     wanted = {role.upper() for role in roles}
     primary = next(
-        (
-            party
-            for party in parties
-            if _normalize_role(party.role) in wanted and party.is_primary
-        ),
+        (party for party in parties if _normalize_role(party.role) in wanted and party.is_primary),
         None,
     )
     if primary is not None:
@@ -453,9 +448,7 @@ def serialize_party(
     )
 
 
-def list_transaction_parties(
-    db: Session, transaction_id: str
-) -> list[TransactionPartyRead]:
+def list_transaction_parties(db: Session, transaction_id: str) -> list[TransactionPartyRead]:
     rows = (
         db.query(TransactionParty)
         .filter(TransactionParty.transaction_id == transaction_id)
@@ -466,10 +459,7 @@ def list_transaction_parties(
         .all()
     )
     users = get_users_by_ids(db, [row.user_id for row in rows if row.user_id])
-    return [
-        serialize_party(row, users.get(row.user_id) if row.user_id else None)
-        for row in rows
-    ]
+    return [serialize_party(row, users.get(row.user_id) if row.user_id else None) for row in rows]
 
 
 def list_parties_for_transactions(
@@ -548,17 +538,14 @@ def enrich_ownership_rows(
 ) -> list[PropertyOwnershipHistoryRead]:
     owners = get_users_by_ids(db, [row.owner_id for row in rows if row.owner_id])
     return [
-        serialize_ownership(row, owners.get(row.owner_id) if row.owner_id else None)
-        for row in rows
+        serialize_ownership(row, owners.get(row.owner_id) if row.owner_id else None) for row in rows
     ]
 
 
 def enrich_transactions(
     db: Session, rows: list[PropertyTransaction]
 ) -> list[PropertyTransactionRead]:
-    parties_by_tx = list_parties_for_transactions(
-        db, [row.transaction_id for row in rows]
-    )
+    parties_by_tx = list_parties_for_transactions(db, [row.transaction_id for row in rows])
     return [
         serialize_transaction(row, parties=parties_by_tx.get(row.transaction_id, []))
         for row in rows
@@ -576,19 +563,13 @@ def get_transaction_detail(
     base = serialize_transaction(row, parties=parties)
 
     prop = get_property(db, row.property_id) if row.property_id else None
-    current_owner = (
-        get_linked_user(db, prop.current_owner_id) if prop is not None else None
-    )
-    property_read = (
-        serialize_property(prop, current_owner) if prop is not None else None
-    )
+    current_owner = get_linked_user(db, prop.current_owner_id) if prop is not None else None
+    property_read = serialize_property(prop, current_owner) if prop is not None else None
 
     seller_id = base.seller.user_id if base.seller else None
     owner_id = prop.current_owner_id if prop is not None else None
     seller_matches = (
-        bool(seller_id and owner_id and seller_id == owner_id)
-        if seller_id or owner_id
-        else None
+        bool(seller_id and owner_id and seller_id == owner_id) if seller_id or owner_id else None
     )
 
     return PropertyTransactionDetailRead(
@@ -613,9 +594,7 @@ def list_properties_for_user(
 
     owned_ids = {
         row[0]
-        for row in db.query(Property.property_id)
-        .filter(Property.current_owner_id == user_id)
-        .all()
+        for row in db.query(Property.property_id).filter(Property.current_owner_id == user_id).all()
         if row[0]
     }
     history_ids = {

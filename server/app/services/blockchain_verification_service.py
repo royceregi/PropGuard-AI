@@ -28,7 +28,6 @@ from app.services.blockchain_hash_service import (
     transaction_data_hash_for,
 )
 
-
 REGISTRY_SOURCE = "Land registry record"
 LEDGER_SOURCE = "Blockchain ledger"
 TRANSACTION_SOURCE = "Transaction record"
@@ -113,7 +112,9 @@ def _display(value: Any) -> str | None:
     if isinstance(value, datetime):
         return value.strftime("%Y-%m-%d %H:%M")
     if isinstance(value, Decimal):
-        return format(value.normalize(), "f") if value == value.to_integral() else format(value, "f")
+        return (
+            format(value.normalize(), "f") if value == value.to_integral() else format(value, "f")
+        )
     text = _clean(value)
     return text or None
 
@@ -183,9 +184,7 @@ def _number_equal(a: Any, b: Any) -> bool:
     return left == right
 
 
-def _compare_property(
-    result: _Comparison, payload: dict[str, Any], prop: Property
-) -> None:
+def _compare_property(result: _Comparison, payload: dict[str, Any], prop: Property) -> None:
     section = "property"
     text_fields = [
         ("title_deed_number", "Title deed number"),
@@ -229,8 +228,7 @@ def _compare_property(
         submitted=payload.get("area_unit"),
         recorded=prop.area_unit,
         source=REGISTRY_SOURCE,
-        equal=normalize_area_unit(payload.get("area_unit"))
-        == normalize_area_unit(prop.area_unit),
+        equal=normalize_area_unit(payload.get("area_unit")) == normalize_area_unit(prop.area_unit),
     )
 
 
@@ -282,8 +280,7 @@ def _compare_transaction(
             submitted=payload.get("currency"),
             recorded=db_tx.currency,
             source=TRANSACTION_SOURCE,
-            equal=normalize_currency(payload.get("currency"))
-            == normalize_currency(db_tx.currency),
+            equal=normalize_currency(payload.get("currency")) == normalize_currency(db_tx.currency),
         )
 
     recorded_dt = (db_tx.transaction_datetime if db_tx else None) or ledger.block_timestamp

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import false, func, or_
 from sqlalchemy.orm import Session
 
@@ -68,11 +70,7 @@ def get_user(db: Session, user_id: str) -> User | None:
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
-    return (
-        db.query(User)
-        .filter(func.lower(User.email) == normalize_email(email))
-        .first()
-    )
+    return db.query(User).filter(func.lower(User.email) == normalize_email(email)).first()
 
 
 def get_user_by_username(db: Session, username: str) -> User | None:
@@ -123,12 +121,7 @@ def get_users(
 
     column = USER_SORT_COLUMNS.get(sort_by, User.created_at)
     ordered = column.asc() if sort_dir == "asc" else column.desc()
-    return (
-        query.order_by(ordered.nulls_last(), User.user_id.asc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    return query.order_by(ordered.nulls_last(), User.user_id.asc()).offset(skip).limit(limit).all()
 
 
 def get_user_stats(db: Session, *, actor_access_level: str | None = None) -> UserStats:
@@ -137,10 +130,7 @@ def get_user_stats(db: Session, *, actor_access_level: str | None = None) -> Use
 
     total_users = scoped().with_entities(func.count(User.user_id)).scalar() or 0
     approved_users = (
-        scoped()
-        .filter(User.is_active.is_(True))
-        .with_entities(func.count(User.user_id))
-        .scalar()
+        scoped().filter(User.is_active.is_(True)).with_entities(func.count(User.user_id)).scalar()
         or 0
     )
     pending_approval = (
@@ -255,4 +245,20 @@ def delete_user(db: Session, user_id: str) -> User | None:
     if db_user:
         db.delete(db_user)
         db.commit()
+    return db_user
+
+
+def confirm_subscription(db: Session, user_id: str, plan: Any) -> User | None:
+    db_user = get_user(db, user_id)
+    if not db_user:
+        return None
+    from app.core.plans import PaymentStatus, SubscriptionStatus, calculate_subscription_end_date
+
+    plan_str = plan.value if hasattr(plan, "value") else str(plan)
+    db_user.subscription_plan = plan_str
+    db_user.payment_status = PaymentStatus.PAID.value
+    db_user.subscription_status = SubscriptionStatus.ACTIVE.value
+    db_user.subscription_end_date = calculate_subscription_end_date(plan_str)
+    db.commit()
+    db.refresh(db_user)
     return db_user

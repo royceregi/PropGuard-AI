@@ -73,9 +73,7 @@ def list_my_properties(
     items, total = property_repository.list_properties_for_user(
         db, current_user.user_id, skip=skip, limit=limit
     )
-    return PaginatedUserRelatedProperties(
-        items=items, total=total, skip=skip, limit=limit
-    )
+    return PaginatedUserRelatedProperties(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get("/{property_id}", response_model=PropertyRead)
@@ -137,9 +135,7 @@ def list_property_documents(
     items, total = property_repository.list_documents(
         db, property_id=property_id, skip=skip, limit=limit
     )
-    return PaginatedPropertyDocuments(
-        items=items, total=total, skip=skip, limit=limit
-    )
+    return PaginatedPropertyDocuments(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get(

@@ -56,9 +56,7 @@ def public_key_hex() -> str | None:
     key = _public_key()
     if key is None:
         return None
-    return key.public_bytes(
-        serialization.Encoding.Raw, serialization.PublicFormat.Raw
-    ).hex()
+    return key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw).hex()
 
 
 def sign(tx_hash: str) -> str:
@@ -102,7 +100,9 @@ def generate_keypair_hex() -> tuple[str, str]:
         serialization.PrivateFormat.Raw,
         serialization.NoEncryption(),
     ).hex()
-    public_hex = private.public_key().public_bytes(
-        serialization.Encoding.Raw, serialization.PublicFormat.Raw
-    ).hex()
+    public_hex = (
+        private.public_key()
+        .public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        .hex()
+    )
     return private_hex, public_hex

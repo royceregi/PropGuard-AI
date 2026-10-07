@@ -9,9 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class HashClearResponse(BaseModel):
     cleared: int
-    detail: str = (
-        "Ledger tx_hash, previous_hash, property_hash, and transaction_data_hash cleared."
-    )
+    detail: str = "Ledger tx_hash, previous_hash, property_hash, and transaction_data_hash cleared."
 
 
 class HashRegenerateResponse(BaseModel):

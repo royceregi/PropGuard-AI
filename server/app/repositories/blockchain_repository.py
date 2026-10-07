@@ -56,17 +56,13 @@ def _resolved_property_id(
     return None
 
 
-def _resolved_currency(
-    row: BlockchainTransaction, linked: PropertyTransaction | None
-) -> str:
+def _resolved_currency(row: BlockchainTransaction, linked: PropertyTransaction | None) -> str:
     if linked and linked.currency and str(linked.currency).strip():
         return str(linked.currency).strip().upper()
     return "AED"
 
 
-def enrich_ledger_row(
-    db: Session, row: BlockchainTransaction
-) -> dict[str, Any]:
+def enrich_ledger_row(db: Session, row: BlockchainTransaction) -> dict[str, Any]:
     linked = None
     if row.transaction_id:
         linked = (
@@ -119,9 +115,7 @@ def enrich_ledger_row(
     }
 
 
-def get_by_transaction_id(
-    db: Session, transaction_id: str
-) -> dict[str, Any] | None:
+def get_by_transaction_id(db: Session, transaction_id: str) -> dict[str, Any] | None:
     row = (
         db.query(BlockchainTransaction)
         .filter(BlockchainTransaction.transaction_id == transaction_id.strip())
@@ -132,16 +126,13 @@ def get_by_transaction_id(
     return enrich_ledger_row(db, row)
 
 
-def get_latest_by_property_id(
-    db: Session, property_id: str
-) -> dict[str, Any] | None:
+def get_latest_by_property_id(db: Session, property_id: str) -> dict[str, Any] | None:
     pid = property_id.strip()
     row = (
         db.query(BlockchainTransaction)
         .outerjoin(
             PropertyTransaction,
-            PropertyTransaction.transaction_id
-            == BlockchainTransaction.transaction_id,
+            PropertyTransaction.transaction_id == BlockchainTransaction.transaction_id,
         )
         .filter(
             or_(
@@ -193,9 +184,7 @@ def list_ledger(
             )
         )
     if transaction_id and transaction_id.strip():
-        query = query.filter(
-            BlockchainTransaction.transaction_id == transaction_id.strip()
-        )
+        query = query.filter(BlockchainTransaction.transaction_id == transaction_id.strip())
     if q and q.strip():
         pattern = f"%{q.strip()}%"
         query = query.filter(
