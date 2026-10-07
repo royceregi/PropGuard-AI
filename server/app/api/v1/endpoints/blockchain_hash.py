@@ -63,9 +63,7 @@ def list_hash_details(
             ),
         ) from exc
 
-    return PaginatedBlockchainHashDetails(
-        items=items, total=total, skip=skip, limit=limit
-    )
+    return PaginatedBlockchainHashDetails(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get("/verify/{transaction_id}", response_model=HashVerifyResponse)

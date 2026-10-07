@@ -148,9 +148,7 @@ class PropertyTransactionDetailRead(PropertyTransactionRead):
 class PropertyDetailRead(PropertyRead):
     documents: list[PropertyDocumentRead] = Field(default_factory=list)
     transactions: list[PropertyTransactionRead] = Field(default_factory=list)
-    ownership_history: list[PropertyOwnershipHistoryRead] = Field(
-        default_factory=list
-    )
+    ownership_history: list[PropertyOwnershipHistoryRead] = Field(default_factory=list)
 
 
 class PaginatedProperties(BaseModel):

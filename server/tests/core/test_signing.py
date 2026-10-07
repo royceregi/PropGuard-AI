@@ -1,5 +1,4 @@
 import pytest
-
 from app.core import signing
 from app.core.config import settings
 

@@ -65,7 +65,17 @@ SNAPSHOT_SECTIONS: dict[str, tuple[str, ...]] = {
 }
 
 _CLEAR_ENCUMBRANCE = {"", "none", "nil", "n/a", "na", "-", "no", "no encumbrances", "clear"}
-_ADVERSE_LEGAL = ("DISPUT", "LITIG", "FROZEN", "SUSPEND", "CAVEAT", "COURT", "SEIZ", "FRAUD", "BLOCK")
+_ADVERSE_LEGAL = (
+    "DISPUT",
+    "LITIG",
+    "FROZEN",
+    "SUSPEND",
+    "CAVEAT",
+    "COURT",
+    "SEIZ",
+    "FRAUD",
+    "BLOCK",
+)
 _VERIFIED_WORDS = ("VERIF", "APPROV", "CONFIRM")
 _BAD_DOCUMENT = ("REJECT", "INVALID", "FAIL", "FORG")
 
@@ -120,7 +130,9 @@ def _conflict(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
 
-def _add_history(req: RiskAssessmentRequest, new_status: str, user: User, note: str | None = None) -> None:
+def _add_history(
+    req: RiskAssessmentRequest, new_status: str, user: User, note: str | None = None
+) -> None:
     events = list(req.history or [])
     events.append(
         {
@@ -143,9 +155,10 @@ def level_for_score(score: int) -> str:
 
 
 def access_map_for_user(db: Session, user_id: str) -> dict[str, str]:
-    """property_id → OWNER (current owner) or SHARED (history / transaction party)."""
+    """property_id → OWNER (current owner) or SHARED (history / transaction party / active share)."""
     owned, history, party = property_repository.property_access_sets(db, user_id)
-    access = {pid: "SHARED" for pid in history | party}
+    shared_active = property_repository.active_shared_property_ids_for_user(db, user_id)
+    access = {pid: "SHARED" for pid in history | party | shared_active}
     access.update({pid: "OWNER" for pid in owned})
     return access
 
@@ -172,12 +185,16 @@ def build_property_snapshot(db: Session, prop: Property) -> dict[str, Any]:
         .limit(10)
         .all()
     )
-    owner_names = {
-        user.user_id: user.full_name
-        for user in db.query(User)
-        .filter(User.user_id.in_({row.owner_id for row in history_rows if row.owner_id}))
-        .all()
-    } if history_rows else {}
+    owner_names = (
+        {
+            user.user_id: user.full_name
+            for user in db.query(User)
+            .filter(User.user_id.in_({row.owner_id for row in history_rows if row.owner_id}))
+            .all()
+        }
+        if history_rows
+        else {}
+    )
 
     return {
         "property_id": prop.property_id,
@@ -226,9 +243,18 @@ def build_property_snapshot(db: Session, prop: Property) -> dict[str, Any]:
     }
 
 
-def snapshot_changes(submitted: dict[str, Any], current: dict[str, Any] | None) -> list[dict[str, Any]]:
+def snapshot_changes(
+    submitted: dict[str, Any], current: dict[str, Any] | None
+) -> list[dict[str, Any]]:
     if current is None:
-        return [{"section": "property_details", "field": "property_id", "submitted": submitted.get("property_id"), "current": None}]
+        return [
+            {
+                "section": "property_details",
+                "field": "property_id",
+                "submitted": submitted.get("property_id"),
+                "current": None,
+            }
+        ]
     changes = []
     for section, fields in SNAPSHOT_SECTIONS.items():
         for field in fields:
@@ -238,8 +264,12 @@ def snapshot_changes(submitted: dict[str, Any], current: dict[str, Any] | None) 
                     {
                         "section": section,
                         "field": field,
-                        "submitted": before if not isinstance(before, list) else f"{len(before)} item(s)",
-                        "current": after if not isinstance(after, list) else f"{len(after)} item(s)",
+                        "submitted": before
+                        if not isinstance(before, list)
+                        else f"{len(before)} item(s)",
+                        "current": after
+                        if not isinstance(after, list)
+                        else f"{len(after)} item(s)",
                     }
                 )
     return changes
@@ -259,7 +289,13 @@ def compute_system_checks(
 
     if prop is None:
         signals.append(
-            _signal("registry_record", "Registry record", "FAIL", 100, "The property no longer exists in the registry.")
+            _signal(
+                "registry_record",
+                "Registry record",
+                "FAIL",
+                100,
+                "The property no longer exists in the registry.",
+            )
         )
     else:
         ledger_rows = (
@@ -270,7 +306,13 @@ def compute_system_checks(
         tx_ids = [row[0] for row in ledger_rows if row[0]]
         if not tx_ids:
             signals.append(
-                _signal("blockchain", "Blockchain integrity", "WARN", 10, "No blockchain record anchors this property.")
+                _signal(
+                    "blockchain",
+                    "Blockchain integrity",
+                    "WARN",
+                    10,
+                    "No blockchain record anchors this property.",
+                )
             )
         else:
             invalid: list[str] = []
@@ -282,7 +324,13 @@ def compute_system_checks(
             except Exception as exc:  # integrity check failures must not block the review
                 logger.warning("Blockchain check failed for %s: %s", prop.property_id, exc)
                 signals.append(
-                    _signal("blockchain", "Blockchain integrity", "INFO", 0, "Blockchain integrity could not be evaluated.")
+                    _signal(
+                        "blockchain",
+                        "Blockchain integrity",
+                        "INFO",
+                        0,
+                        "Blockchain integrity could not be evaluated.",
+                    )
                 )
             else:
                 if invalid:
@@ -297,26 +345,88 @@ def compute_system_checks(
                     )
                 else:
                     signals.append(
-                        _signal("blockchain", "Blockchain integrity", "PASS", 0, f"All {len(tx_ids)} ledger block(s) verified.")
+                        _signal(
+                            "blockchain",
+                            "Blockchain integrity",
+                            "PASS",
+                            0,
+                            f"All {len(tx_ids)} ledger block(s) verified.",
+                        )
                     )
+
+            # Wire 4-agent orchestrator pipeline to risk assessment signals (Phase 8b / Phase 9g)
+            try:
+                from app.agents import orchestrator
+
+                inv = orchestrator.investigate(db, tx_ids[0])
+                if inv and inv.get("report"):
+                    rep = inv["report"]
+                    r_level = rep.get("risk_summary", {}).get("risk_level", "LOW")
+                    r_summary = rep.get("executive_summary") or ""
+                    r_rec = rep.get("recommendation") or ""
+                    signals.append(
+                        _signal(
+                            "ai_investigation_report",
+                            "AI Investigation Report",
+                            "PASS"
+                            if r_level == "LOW"
+                            else ("FAIL" if r_level == "HIGH" else "WARN"),
+                            25 if r_level == "HIGH" else (10 if r_level == "MEDIUM" else 0),
+                            f"Risk Level: {r_level}. {r_summary} Recommendation: {r_rec}",
+                        )
+                    )
+            except Exception as exc:
+                logger.warning("Orchestrator pipeline signal skipped for %s: %s", tx_ids[0], exc)
 
         encumbrance = _text(prop.encumbrances)
         if encumbrance.lower() in _CLEAR_ENCUMBRANCE:
-            signals.append(_signal("encumbrances", "Encumbrances", "PASS", 0, "No encumbrances recorded."))
+            signals.append(
+                _signal("encumbrances", "Encumbrances", "PASS", 0, "No encumbrances recorded.")
+            )
         else:
-            signals.append(_signal("encumbrances", "Encumbrances", "WARN", 20, f"Recorded encumbrance: {encumbrance}"))
+            signals.append(
+                _signal(
+                    "encumbrances",
+                    "Encumbrances",
+                    "WARN",
+                    20,
+                    f"Recorded encumbrance: {encumbrance}",
+                )
+            )
 
         legal = _text(prop.legal_status).upper()
         if not legal:
-            signals.append(_signal("legal_status", "Legal status", "INFO", 5, "Legal status is not recorded."))
+            signals.append(
+                _signal("legal_status", "Legal status", "INFO", 5, "Legal status is not recorded.")
+            )
         elif any(word in legal for word in _ADVERSE_LEGAL):
-            signals.append(_signal("legal_status", "Legal status", "FAIL", 25, f"Adverse legal status: {prop.legal_status}"))
+            signals.append(
+                _signal(
+                    "legal_status",
+                    "Legal status",
+                    "FAIL",
+                    25,
+                    f"Adverse legal status: {prop.legal_status}",
+                )
+            )
         else:
-            signals.append(_signal("legal_status", "Legal status", "PASS", 0, f"Legal status: {prop.legal_status}"))
+            signals.append(
+                _signal(
+                    "legal_status", "Legal status", "PASS", 0, f"Legal status: {prop.legal_status}"
+                )
+            )
 
         verification = _text(prop.verification_status).upper()
         if any(word in verification for word in _VERIFIED_WORDS):
-            signals.append(_signal("registry_verification", "Registry verification", "PASS", 0, f"Status: {prop.verification_status}"))
+            signals.append(
+                _signal(
+                    "registry_verification",
+                    "Registry verification",
+                    "PASS",
+                    0,
+                    f"Status: {prop.verification_status}",
+                )
+            )
         else:
             signals.append(
                 _signal(
@@ -349,38 +459,87 @@ def compute_system_checks(
             )
         else:
             signals.append(
-                _signal("ownership_turnover", "Ownership turnover", "PASS", 0, "No rapid ownership changes in the last 12 months.")
+                _signal(
+                    "ownership_turnover",
+                    "Ownership turnover",
+                    "PASS",
+                    0,
+                    "No rapid ownership changes in the last 12 months.",
+                )
             )
 
-        docs = db.query(PropertyDocument).filter(PropertyDocument.property_id == prop.property_id).all()
-        bad = [doc for doc in docs if any(word in _text(doc.verification_status).upper() for word in _BAD_DOCUMENT)]
+        docs = (
+            db.query(PropertyDocument)
+            .filter(PropertyDocument.property_id == prop.property_id)
+            .all()
+        )
+        bad = [
+            doc
+            for doc in docs
+            if any(word in _text(doc.verification_status).upper() for word in _BAD_DOCUMENT)
+        ]
         pending = [
             doc
             for doc in docs
-            if doc not in bad and not any(word in _text(doc.verification_status).upper() for word in _VERIFIED_WORDS)
+            if doc not in bad
+            and not any(word in _text(doc.verification_status).upper() for word in _VERIFIED_WORDS)
         ]
         if not docs:
-            signals.append(_signal("documents", "Supporting documents", "WARN", 5, "No documents on file."))
+            signals.append(
+                _signal("documents", "Supporting documents", "WARN", 5, "No documents on file.")
+            )
         elif bad:
             signals.append(
-                _signal("documents", "Supporting documents", "FAIL", 15, f"{len(bad)} document(s) marked rejected or invalid.")
+                _signal(
+                    "documents",
+                    "Supporting documents",
+                    "FAIL",
+                    15,
+                    f"{len(bad)} document(s) marked rejected or invalid.",
+                )
             )
         elif pending:
             signals.append(
-                _signal("documents", "Supporting documents", "WARN", 5, f"{len(pending)} document(s) awaiting verification.")
+                _signal(
+                    "documents",
+                    "Supporting documents",
+                    "WARN",
+                    5,
+                    f"{len(pending)} document(s) awaiting verification.",
+                )
             )
         else:
-            signals.append(_signal("documents", "Supporting documents", "PASS", 0, f"All {len(docs)} document(s) verified."))
+            signals.append(
+                _signal(
+                    "documents",
+                    "Supporting documents",
+                    "PASS",
+                    0,
+                    f"All {len(docs)} document(s) verified.",
+                )
+            )
 
         changes = snapshot_changes(submitted_snapshot, build_property_snapshot(db, prop))
         if changes:
             fields = ", ".join(sorted({change["field"] for change in changes})[:6])
             signals.append(
-                _signal("record_changes", "Record changes since submission", "WARN", 10, f"Changed fields: {fields}.")
+                _signal(
+                    "record_changes",
+                    "Record changes since submission",
+                    "WARN",
+                    10,
+                    f"Changed fields: {fields}.",
+                )
             )
         else:
             signals.append(
-                _signal("record_changes", "Record changes since submission", "PASS", 0, "Registry record unchanged since submission.")
+                _signal(
+                    "record_changes",
+                    "Record changes since submission",
+                    "PASS",
+                    0,
+                    "Registry record unchanged since submission.",
+                )
             )
 
     score = min(100, sum(item["weight"] for item in signals))
@@ -406,7 +565,10 @@ def _property_map(db: Session, property_ids: set[str]) -> dict[str, Property]:
     ids = {pid for pid in property_ids if pid}
     if not ids:
         return {}
-    return {prop.property_id: prop for prop in db.query(Property).filter(Property.property_id.in_(ids)).all()}
+    return {
+        prop.property_id: prop
+        for prop in db.query(Property).filter(Property.property_id.in_(ids)).all()
+    }
 
 
 def _summary(
@@ -423,8 +585,12 @@ def _summary(
         "status": req.status,
         "submitted_at": req.submitted_at,
         "completed_at": req.completed_at,
-        "risk_score": req.risk_score if req.status == VERIFIED or _level(viewer) == REGISTRY_LEVEL else None,
-        "risk_level": req.risk_level if req.status == VERIFIED or _level(viewer) == REGISTRY_LEVEL else None,
+        "risk_score": req.risk_score
+        if req.status == VERIFIED or _level(viewer) == REGISTRY_LEVEL
+        else None,
+        "risk_level": req.risk_level
+        if req.status == VERIFIED or _level(viewer) == REGISTRY_LEVEL
+        else None,
         "requester": {
             "user_id": req.requester_id,
             "full_name": requester.full_name if requester else None,
@@ -444,13 +610,19 @@ def _detail(db: Session, req: RiskAssessmentRequest, viewer: User) -> dict[str, 
     verified = req.status == VERIFIED
     data.update(
         {
-            "requester_notes": req.requester_notes if (is_registry or data["is_own_request"]) else None,
+            "requester_notes": req.requester_notes
+            if (is_registry or data["is_own_request"])
+            else None,
             "include_evidence": req.include_evidence,
             "submitted_snapshot": req.submitted_snapshot,
-            "verification_checks": {key: (req.verification_checks or {}).get(key) for key in VERIFICATION_SECTIONS},
+            "verification_checks": {
+                key: (req.verification_checks or {}).get(key) for key in VERIFICATION_SECTIONS
+            },
             "registry_notes": req.registry_notes if (is_registry or verified) else None,
             "rejection_reason": req.rejection_reason,
-            "system_signals": req.system_signals if (is_registry or (verified and req.include_evidence)) else None,
+            "system_signals": req.system_signals
+            if (is_registry or (verified and req.include_evidence))
+            else None,
             "result_hash": req.result_hash if verified else None,
             "review_started_at": req.review_started_at,
             "reviewer_name": reviewer.full_name if reviewer and (is_registry or verified) else None,
@@ -458,9 +630,11 @@ def _detail(db: Session, req: RiskAssessmentRequest, viewer: User) -> dict[str, 
                 {
                     **event,
                     "by": event.get("by") if is_registry else None,
-                    "by_name": (users.get(event.get("by") or "").full_name if users.get(event.get("by") or "") else None)
-                    if is_registry
-                    else None,
+                    "by_name": (
+                        getattr(users.get(event.get("by") or ""), "full_name", None)
+                        if is_registry
+                        else None
+                    ),
                 }
                 for event in (req.history or [])
             ],
@@ -501,14 +675,20 @@ def _ensure_can_view(db: Session, user: User, req: RiskAssessmentRequest) -> Non
 
 def preview_snapshot(db: Session, user: User, property_id: str) -> dict[str, Any]:
     prop = property_repository.get_property(db, property_id)
-    if prop is None or not property_repository.user_can_access_property(db, user.user_id, property_id):
+    if prop is None or not property_repository.user_can_access_property(
+        db, user.user_id, property_id
+    ):
         raise HTTPException(status_code=404, detail="Property not found or not shared with you.")
     return build_property_snapshot(db, prop)
 
 
-def create_request(db: Session, user: User, property_id: str, notes: str | None, include_evidence: bool) -> dict[str, Any]:
+def create_request(
+    db: Session, user: User, property_id: str, notes: str | None, include_evidence: bool
+) -> dict[str, Any]:
     prop = property_repository.get_property(db, property_id)
-    if prop is None or not property_repository.user_can_access_property(db, user.user_id, property_id):
+    if prop is None or not property_repository.user_can_access_property(
+        db, user.user_id, property_id
+    ):
         raise HTTPException(
             status_code=404,
             detail="Property not found or not shared with you. You can only request assessments for your own or shared properties.",
@@ -526,6 +706,8 @@ def create_request(db: Session, user: User, property_id: str, notes: str | None,
     if active is not None:
         raise _conflict(f"You already have an active request ({active[0]}) for this property.")
 
+    snapshot = build_property_snapshot(db, prop)
+    system_signals = compute_system_checks(db, prop, snapshot)
     req = RiskAssessmentRequest(
         request_id=f"RAR-{uuid.uuid4().hex[:10].upper()}",
         property_id=property_id,
@@ -533,7 +715,10 @@ def create_request(db: Session, user: User, property_id: str, notes: str | None,
         requester_access_level=_level(user),
         requester_notes=(notes or "").strip() or None,
         include_evidence=include_evidence,
-        submitted_snapshot=build_property_snapshot(db, prop),
+        submitted_snapshot=snapshot,
+        system_signals=system_signals,
+        risk_score=system_signals.get("suggested_score"),
+        risk_level=system_signals.get("suggested_level"),
         status=SUBMITTED,
         verification_checks={},
         history=[],
@@ -543,6 +728,17 @@ def create_request(db: Session, user: User, property_id: str, notes: str | None,
     db.add(req)
     db.commit()
     db.refresh(req)
+
+    # Dispatch Notification (Phase 10)
+    from app.services import notification_service
+
+    notification_service.notify_risk_request_created(
+        db,
+        buyer_user_id=user.user_id,
+        request_id=req.request_id,
+        property_id=req.property_id,
+    )
+
     return _detail(db, req, user)
 
 
@@ -577,12 +773,17 @@ def requester_overview(db: Session, user: User) -> dict[str, Any]:
         if prop is None:
             continue
         rows = by_property.get(property_id, [])
-        mine_active = next((r for r in rows if r.requester_id == user.user_id and r.status in ACTIVE_STATUSES), None)
+        mine_active = next(
+            (r for r in rows if r.requester_id == user.user_id and r.status in ACTIVE_STATUSES),
+            None,
+        )
         latest_verified = next((r for r in rows if r.status == VERIFIED), None)
         mine_latest = next((r for r in rows if r.requester_id == user.user_id), None)
         chosen = mine_active or latest_verified or mine_latest
 
-        active_count += sum(1 for r in rows if r.requester_id == user.user_id and r.status in ACTIVE_STATUSES)
+        active_count += sum(
+            1 for r in rows if r.requester_id == user.user_id and r.status in ACTIVE_STATUSES
+        )
         completed_ids.update(r.request_id for r in rows if r.status == VERIFIED)
 
         row = {
@@ -597,7 +798,11 @@ def requester_overview(db: Session, user: User) -> dict[str, Any]:
 
     def sort_key(row: dict[str, Any]) -> tuple:
         submitted = row["request"]["submitted_at"] if row["request"] else datetime.min
-        return (row["request"] is None, -submitted.timestamp() if row["request"] else 0, row["property_id"])
+        return (
+            row["request"] is None,
+            -submitted.timestamp() if row["request"] else 0,
+            row["property_id"],
+        )
 
     my_rows.sort(key=sort_key)
     shared_rows.sort(key=sort_key)
@@ -639,32 +844,39 @@ def registry_queue(
     if requester_type:
         query = query.filter(RiskAssessmentRequest.requester_access_level == requester_type.upper())
     if submitted_from:
-        query = query.filter(RiskAssessmentRequest.submitted_at >= datetime.combine(submitted_from, datetime.min.time()))
+        query = query.filter(
+            RiskAssessmentRequest.submitted_at
+            >= datetime.combine(submitted_from, datetime.min.time())
+        )
     if submitted_to:
         query = query.filter(
-            RiskAssessmentRequest.submitted_at < datetime.combine(submitted_to + timedelta(days=1), datetime.min.time())
+            RiskAssessmentRequest.submitted_at
+            < datetime.combine(submitted_to + timedelta(days=1), datetime.min.time())
         )
 
     total = query.count()
-    rows = (
-        query.order_by(RiskAssessmentRequest.submitted_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    rows = query.order_by(RiskAssessmentRequest.submitted_at.desc()).offset(skip).limit(limit).all()
     users = _user_map(db, {row.requester_id for row in rows})
     props = _property_map(db, {row.property_id for row in rows})
 
-    under_review = db.query(RiskAssessmentRequest).filter(RiskAssessmentRequest.status == UNDER_REVIEW).all()
+    under_review = (
+        db.query(RiskAssessmentRequest).filter(RiskAssessmentRequest.status == UNDER_REVIEW).all()
+    )
     today = datetime.combine(date.today(), datetime.min.time())
     summary = {
-        "pending_intake": db.query(RiskAssessmentRequest).filter(RiskAssessmentRequest.status == SUBMITTED).count(),
+        "pending_intake": db.query(RiskAssessmentRequest)
+        .filter(RiskAssessmentRequest.status == SUBMITTED)
+        .count(),
         "under_review": len(under_review),
         "needs_clarification": sum(
-            1 for row in under_review if any(value is False for value in (row.verification_checks or {}).values())
+            1
+            for row in under_review
+            if any(value is False for value in (row.verification_checks or {}).values())
         ),
         "completed_today": db.query(RiskAssessmentRequest)
-        .filter(RiskAssessmentRequest.status == VERIFIED, RiskAssessmentRequest.completed_at >= today)
+        .filter(
+            RiskAssessmentRequest.status == VERIFIED, RiskAssessmentRequest.completed_at >= today
+        )
         .count(),
     }
     return {
@@ -743,7 +955,9 @@ def _result_hash(req: RiskAssessmentRequest) -> str:
         "risk_score": req.risk_score,
         "risk_level": req.risk_level,
         "registry_notes": req.registry_notes,
-        "verification_checks": {key: (req.verification_checks or {}).get(key) for key in VERIFICATION_SECTIONS},
+        "verification_checks": {
+            key: (req.verification_checks or {}).get(key) for key in VERIFICATION_SECTIONS
+        },
         "reviewer_id": req.reviewer_id,
         "completed_at": req.completed_at.isoformat() if req.completed_at else None,
     }
@@ -764,7 +978,9 @@ def verify_and_send(
     _require_under_review(req)
     _merge_checks(req, checks)
 
-    unverified = [key for key in VERIFICATION_SECTIONS if (req.verification_checks or {}).get(key) is not True]
+    unverified = [
+        key for key in VERIFICATION_SECTIONS if (req.verification_checks or {}).get(key) is not True
+    ]
     if unverified:
         labels = ", ".join(key.replace("_", " ") for key in unverified)
         raise HTTPException(
@@ -781,8 +997,26 @@ def verify_and_send(
     req.completed_at = _now()
     req.status = VERIFIED
     req.result_hash = _result_hash(req)
-    _add_history(req, VERIFIED, user, f"Assessment verified: {req.risk_level} risk ({risk_score}/100). Result sent to requester.")
+    _add_history(
+        req,
+        VERIFIED,
+        user,
+        f"Assessment verified: {req.risk_level} risk ({risk_score}/100). Result sent to requester.",
+    )
     db.commit()
+
+    # Dispatch Notification (Phase 10)
+    from app.services import notification_service
+
+    notification_service.notify_risk_request_completed(
+        db,
+        buyer_user_id=req.requester_id,
+        request_id=req.request_id,
+        property_id=req.property_id,
+        status=VERIFIED,
+        risk_level=req.risk_level,
+    )
+
     return _detail(db, req, user)
 
 
@@ -796,6 +1030,18 @@ def reject(db: Session, user: User, request_id: str, reason: str) -> dict[str, A
     req.completed_at = _now()
     _add_history(req, REJECTED, user, reason)
     db.commit()
+
+    # Dispatch Notification (Phase 10)
+    from app.services import notification_service
+
+    notification_service.notify_risk_request_completed(
+        db,
+        buyer_user_id=req.requester_id,
+        request_id=req.request_id,
+        property_id=req.property_id,
+        status=REJECTED,
+    )
+
     return _detail(db, req, user)
 
 
@@ -812,7 +1058,13 @@ def certificate_html(db: Session, user: User, request_id: str) -> tuple[str, str
     reviewer = _user_map(db, {req.reviewer_id or ""}).get(req.reviewer_id or "")
     esc = lambda value: html.escape(_text(value) or "—")  # noqa: E731
     location = ", ".join(
-        part for part in (_text(snapshot.get("address")), _text(snapshot.get("district")), _text(snapshot.get("city"))) if part
+        part
+        for part in (
+            _text(snapshot.get("address")),
+            _text(snapshot.get("district")),
+            _text(snapshot.get("city")),
+        )
+        if part
     )
     signals = (req.system_signals or {}).get("signals", []) if req.include_evidence else []
     signal_rows = "".join(
@@ -833,12 +1085,12 @@ th{{background:#f3f4f6}}code{{word-break:break-all}}</style></head><body>
 <table>
 <tr><th>Request ID</th><td>{esc(req.request_id)}</td></tr>
 <tr><th>Property ID</th><td>{esc(req.property_id)}</td></tr>
-<tr><th>Title deed</th><td>{esc(snapshot.get('title_deed_number'))}</td></tr>
+<tr><th>Title deed</th><td>{esc(snapshot.get("title_deed_number"))}</td></tr>
 <tr><th>Location</th><td>{esc(location)}</td></tr>
 <tr><th>Risk level</th><td>{esc(req.risk_level)}</td></tr>
 <tr><th>Risk score</th><td>{esc(req.risk_score)} / 100</td></tr>
-<tr><th>Verified by</th><td>{esc(reviewer.full_name if reviewer else 'Land Registry')}</td></tr>
-<tr><th>Verified at</th><td>{esc(req.completed_at.strftime('%Y-%m-%d %H:%M') if req.completed_at else None)}</td></tr>
+<tr><th>Verified by</th><td>{esc(reviewer.full_name if reviewer else "Land Registry")}</td></tr>
+<tr><th>Verified at</th><td>{esc(req.completed_at.strftime("%Y-%m-%d %H:%M") if req.completed_at else None)}</td></tr>
 </table>
 <h2>Registry findings</h2><p>{esc(req.registry_notes)}</p>
 {evidence}

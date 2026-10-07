@@ -53,9 +53,7 @@ def transaction_data_hash_for(
     )
 
 
-def _linked_transaction(
-    db: Session, transaction_id: str | None
-) -> PropertyTransaction | None:
+def _linked_transaction(db: Session, transaction_id: str | None) -> PropertyTransaction | None:
     if not transaction_id or not str(transaction_id).strip():
         return None
     return (
@@ -109,11 +107,7 @@ def regenerate_hashes(db: Session, *, commit: bool = True) -> dict[str, int]:
     rows = db.query(BlockchainTransaction).all()
     total = len(rows)
 
-    properties = {
-        p.property_id: p
-        for p in db.query(Property).all()
-        if p.property_id is not None
-    }
+    properties = {p.property_id: p for p in db.query(Property).all() if p.property_id is not None}
     linked_by_tx = {
         t.transaction_id: t
         for t in db.query(PropertyTransaction).all()
@@ -219,9 +213,7 @@ def rebuild_hashes(db: Session) -> dict[str, int]:
         raise
 
 
-def check_documents(
-    db: Session, transaction_id: str | None
-) -> tuple[bool, list[dict[str, Any]]]:
+def check_documents(db: Session, transaction_id: str | None) -> tuple[bool, list[dict[str, Any]]]:
     """Re-hash every document of a transaction. Documents without a stored hash are skipped."""
     if not transaction_id or not str(transaction_id).strip():
         return True, []
@@ -254,11 +246,7 @@ def chain_context(db: Session, row: BlockchainTransaction) -> tuple[str, bool]:
     if not pid:
         return GENESIS_PREVIOUS_HASH, True
 
-    peers = (
-        db.query(BlockchainTransaction)
-        .filter(BlockchainTransaction.property_id == pid)
-        .all()
-    )
+    peers = db.query(BlockchainTransaction).filter(BlockchainTransaction.property_id == pid).all()
     peers.sort(key=_chain_sort_key)
     for index, peer in enumerate(peers):
         if peer.blockchain_tx_id == row.blockchain_tx_id:
@@ -356,11 +344,7 @@ def verify_transaction(db: Session, transaction_id: str) -> dict[str, Any] | Non
 
     prop = None
     if row.property_id:
-        prop = (
-            db.query(Property)
-            .filter(Property.property_id == row.property_id)
-            .first()
-        )
+        prop = db.query(Property).filter(Property.property_id == row.property_id).first()
 
     expected_previous, is_chain_head = chain_context(db, row)
     stored_previous = row.previous_hash
@@ -373,17 +357,14 @@ def verify_transaction(db: Session, transaction_id: str) -> dict[str, Any] | Non
         row, _linked_transaction(db, row.transaction_id)
     )
     transaction_data_hash_match = (
-        bool(row.transaction_data_hash)
-        and row.transaction_data_hash == recomputed_data_hash
+        bool(row.transaction_data_hash) and row.transaction_data_hash == recomputed_data_hash
     )
 
     # Prefer verifying against the chain-correct previous hash when stored is genesis-linked.
     if previous_hash_match:
         chain_previous = expected_previous
     else:
-        chain_previous = (
-            stored_previous if stored_previous is not None else GENESIS_PREVIOUS_HASH
-        )
+        chain_previous = stored_previous if stored_previous is not None else GENESIS_PREVIOUS_HASH
     recomputed_tx = compute_tx_hash(
         previous_hash=chain_previous,
         transaction_data_hash=recomputed_data_hash,
@@ -407,9 +388,7 @@ def verify_transaction(db: Session, transaction_id: str) -> dict[str, Any] | Non
         and not ledger["duplicate_tx_hash"]
     )
 
-    chain_position = (
-        "GENESIS" if is_genesis_previous(stored_previous) else "LINKED"
-    )
+    chain_position = "GENESIS" if is_genesis_previous(stored_previous) else "LINKED"
 
     return {
         "tx_hash_match": tx_hash_match,

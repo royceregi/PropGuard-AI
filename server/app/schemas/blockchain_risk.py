@@ -29,7 +29,9 @@ class BlockchainRiskAssessment(BaseModel):
     transaction_id: str
     property_id: str | None = None
     integrity: str | None = None
-    risk_score: float | None = Field(default=None, description="0–1; LOW < 0.40 ≤ MEDIUM < 0.70 ≤ HIGH")
+    risk_score: float | None = Field(
+        default=None, description="0–1; LOW < 0.40 ≤ MEDIUM < 0.70 ≤ HIGH"
+    )
     risk_level: Literal["LOW", "MEDIUM", "HIGH"] | None = None
     model_name: str | None = None
     model_version: str | None = None
@@ -52,6 +54,4 @@ class AgentOutput(BaseModel):
 class BlockchainInvestigationResponse(BaseModel):
     assessment: BlockchainRiskAssessment | None
     agents: list[AgentOutput]
-    notice: str = (
-        "This is a risk indicator for investigation, not a legal fraud judgment."
-    )
+    notice: str = "This is a risk indicator for investigation, not a legal fraud judgment."

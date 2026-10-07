@@ -66,9 +66,7 @@ def list_blockchain_transactions(
         q=q,
         property_ids=allowed_ids,
     )
-    return PaginatedBlockchainTransactions(
-        items=items, total=total, skip=skip, limit=limit
-    )
+    return PaginatedBlockchainTransactions(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.get("/form-options", response_model=VerificationFormOptions)
@@ -99,9 +97,7 @@ def get_latest_by_property(
     ensure_property_access(db, current_user, property_id)
     row = blockchain_repository.get_latest_by_property_id(db, property_id)
     if row is None:
-        raise HTTPException(
-            status_code=404, detail="No blockchain ledger record for this property"
-        )
+        raise HTTPException(status_code=404, detail="No blockchain ledger record for this property")
     return row
 
 

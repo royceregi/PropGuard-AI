@@ -1,8 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+
 from app.api.deps import require_roles
+from app.core.database import get_db
+from app.core.roles import AccessLevel
+from app.models.user import User as UserModel
+from app.repositories import property_repository, user_repository
+from app.schemas.property import PaginatedUserRelatedProperties
 from app.schemas.user import (
     User,
     UserAccessLevelUpdate,
@@ -10,11 +16,6 @@ from app.schemas.user import (
     UserStats,
     UserUpdate,
 )
-from app.schemas.property import PaginatedUserRelatedProperties
-from app.repositories import property_repository, user_repository
-from app.core.database import get_db
-from app.core.roles import AccessLevel
-from app.models.user import User as UserModel
 
 router = APIRouter()
 
@@ -28,9 +29,7 @@ ADMIN_ONLY = [AccessLevel.SYSTEM.value]
 
 
 def _ensure_visible(actor: UserModel, target: UserModel | None) -> UserModel:
-    if target is None or not user_repository.actor_can_view_user(
-        actor.access_level, target
-    ):
+    if target is None or not user_repository.actor_can_view_user(actor.access_level, target):
         raise HTTPException(status_code=404, detail="User not found")
     return target
 
@@ -40,9 +39,7 @@ def read_user_stats(
     db: Session = Depends(get_db),
     actor: UserModel = Depends(require_roles(DIRECTORY_LEVELS)),
 ):
-    return user_repository.get_user_stats(
-        db, actor_access_level=actor.access_level
-    )
+    return user_repository.get_user_stats(db, actor_access_level=actor.access_level)
 
 
 @router.get("/", response_model=List[User])
@@ -50,7 +47,9 @@ def read_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     q: str | None = Query(None, max_length=120),
-    sort_by: str = Query("created_at", pattern="^(" + "|".join(user_repository.USER_SORT_COLUMNS) + ")$"),
+    sort_by: str = Query(
+        "created_at", pattern="^(" + "|".join(user_repository.USER_SORT_COLUMNS) + ")$"
+    ),
     sort_dir: str = Query("desc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
     actor: UserModel = Depends(require_roles(DIRECTORY_LEVELS)),
@@ -86,12 +85,8 @@ def list_user_properties(
 ):
     existing = user_repository.get_user(db, user_id)
     _ensure_visible(actor, existing)
-    items, total = property_repository.list_properties_for_user(
-        db, user_id, skip=skip, limit=limit
-    )
-    return PaginatedUserRelatedProperties(
-        items=items, total=total, skip=skip, limit=limit
-    )
+    items, total = property_repository.list_properties_for_user(db, user_id, skip=skip, limit=limit)
+    return PaginatedUserRelatedProperties(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.post("/{user_id}/approve", response_model=User)
@@ -192,6 +187,16 @@ def set_user_access_level(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Dispatch Notification (Phase 10)
+    from app.services import notification_service
+
+    notification_service.notify_access_level_changed(
+        db,
+        target_user_id=user_id,
+        new_access_level=next_level,
+    )
+
     return db_user
 
 

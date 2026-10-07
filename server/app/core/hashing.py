@@ -8,7 +8,6 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-
 GENESIS_PREVIOUS_HASH = "0"
 
 # Authoritative property fields for property_hash (excludes mutable status/timestamps).
@@ -255,21 +254,15 @@ def is_genesis_previous(previous_hash: Any) -> bool:
 
 def values_equal(left: Any, right: Any, *, kind: str = "text") -> bool:
     if kind == "wallet":
-        return normalize_wallet(left) == normalize_wallet(right) and bool(
-            normalize_wallet(left)
-        )
+        return normalize_wallet(left) == normalize_wallet(right) and bool(normalize_wallet(left))
     if kind == "money":
-        return normalize_money(left) == normalize_money(right) and bool(
-            normalize_money(left)
-        )
+        return normalize_money(left) == normalize_money(right) and bool(normalize_money(left))
     if kind == "currency":
         return normalize_currency(left) == normalize_currency(right) and bool(
             normalize_currency(left)
         )
     if kind == "type":
-        return normalize_type(left) == normalize_type(right) and bool(
-            normalize_type(left)
-        )
+        return normalize_type(left) == normalize_type(right) and bool(normalize_type(left))
     if kind == "hash":
         a = normalize_text(left).lower()
         b = normalize_text(right).lower()

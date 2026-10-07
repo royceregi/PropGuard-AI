@@ -50,7 +50,9 @@ def run(db: Session, transaction_id: str) -> tuple[dict[str, Any], dict[str, Any
     try:
         evaluation = blockchain_risk_service.evaluate(db, transaction_id)
     except Exception as exc:
-        log_run(db, AGENT_NAME, input_data=input_data, output=None, started_at=started, error=str(exc))
+        log_run(
+            db, AGENT_NAME, input_data=input_data, output=None, started_at=started, error=str(exc)
+        )
         raise
 
     if evaluation is None:
@@ -73,7 +75,9 @@ def run(db: Session, transaction_id: str) -> tuple[dict[str, Any], dict[str, Any
     if verify["digital_signature_valid"] is None:
         warnings.append("Registry signature not checked: no public key configured.")
     if not_applicable:
-        warnings.append(f"{not_applicable} of {total} registry checks were not applicable (missing data).")
+        warnings.append(
+            f"{not_applicable} of {total} registry checks were not applicable (missing data)."
+        )
     # Confidence = share of checks that had enough data to decide.
     confidence = 1.0 if total == 0 else (total - not_applicable) / total
 
