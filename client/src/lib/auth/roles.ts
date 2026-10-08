@@ -48,6 +48,10 @@ const ROUTE_ACCESS: Array<{
     levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
   },
   {
+    prefix: "/notifications",
+    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
+  },
+  {
     prefix: "/users",
     levels: ["SYSTEM", "REGISTRY", "COMPANY"]
   },
@@ -61,6 +65,10 @@ const ROUTE_ACCESS: Array<{
   },
   {
     prefix: "/transactions",
+    levels: ["SYSTEM", "REGISTRY", "COMPANY"]
+  },
+  {
+    prefix: "/shared-properties",
     levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
   },
   {

@@ -25,13 +25,17 @@ from app.services import blockchain_verification_service
 router = APIRouter()
 
 VIEW_ROLES = ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC", "STANDARD"]
-# Verification only reads records; buyers (PUBLIC) are limited to own or shared properties.
-VERIFY_ROLES = ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
-VERIFY_FORBIDDEN = "You can only verify properties you own or that were shared with you."
+# Verification is restricted to authorities and real estate companies.
+VERIFY_ROLES = ["SYSTEM", "REGISTRY", "COMPANY"]
+VERIFY_FORBIDDEN = "Blockchain verification is restricted for public users."
 
 
 def _ensure_can_verify(db: Session, user: UserModel, property_id: str, transaction_id: str) -> None:
     """Same 403 whether the record is missing or not shared, so IDs can't be probed."""
+    if user.access_level == "PUBLIC":
+        raise HTTPException(
+            status_code=403, detail="Blockchain verification is restricted for public users."
+        )
     if is_authority_viewer(user):
         return
     try:

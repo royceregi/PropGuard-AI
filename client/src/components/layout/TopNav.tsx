@@ -8,6 +8,7 @@ import {
   ProfileMenuModal,
   type ProfileMenuAction
 } from "@/components/layout/ProfileMenuModal";
+import { NotificationsPopover } from "@/components/layout/NotificationsPopover";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { ACCESS_LABELS } from "@/lib/auth/roles";
@@ -171,14 +172,7 @@ export function TopNav({
           ) : null}
         </div>
 
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="relative p-1 text-text-muted transition-colors hover:text-text-primary"
-        >
-          <Icons.Notifications className="h-6 w-6 text-[24px]" />
-          <span className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-danger ring-2 ring-surface" />
-        </button>
+        <NotificationsPopover />
 
         <div className="relative">
           <button

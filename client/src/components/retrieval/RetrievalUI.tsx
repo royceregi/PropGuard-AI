@@ -1,8 +1,13 @@
 "use client";
 
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState
+} from "react";
 import Link from "next/link";
-import { isAxiosError } from "axios";
 import { Icons } from "@/components/icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/hooks/useAuth";
@@ -33,14 +38,14 @@ const EXAMPLE_QUERIES = [
   "Documents with hash mismatch",
   "rapid ownership changes",
   "suspicious high risk transactions",
-  "villa mortgaged Wadi Al Safa",
+  "villa mortgaged Wadi Al Safa"
 ];
 
 const SOURCE_OPTIONS = [
   { value: "", label: "All sources" },
   { value: "property", label: "Properties" },
   { value: "transaction", label: "Transactions" },
-  { value: "document", label: "Documents" },
+  { value: "document", label: "Documents" }
 ];
 
 // ─── sub-components ─────────────────────────────────────────────────────────
@@ -48,11 +53,7 @@ const SOURCE_OPTIONS = [
 function RelevanceBar({ score }: { score: number }) {
   const pct = Math.round(score * 100);
   const color =
-    score >= 0.9
-      ? "bg-success"
-      : score >= 0.7
-        ? "bg-primary"
-        : "bg-warning";
+    score >= 0.9 ? "bg-success" : score >= 0.7 ? "bg-primary" : "bg-warning";
   return (
     <div className="flex items-center gap-1.5">
       <div className="h-1.5 w-14 overflow-hidden rounded-full bg-surface-subtle">
@@ -76,7 +77,7 @@ function HitCard({ hit }: { hit: RetrievalHit }) {
   const intentLabel =
     hit.intent && hit.intent in INTENT_LABELS
       ? INTENT_LABELS[hit.intent]
-      : hit.intent ?? null;
+      : (hit.intent ?? null);
 
   return (
     <div className="rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-sm">
@@ -138,9 +139,7 @@ function HitCard({ hit }: { hit: RetrievalHit }) {
             {hit.evidence_id && (
               <span className="font-mono">{hit.evidence_id}</span>
             )}
-            {hit.occurred_at && (
-              <span>{formatDate(hit.occurred_at)}</span>
-            )}
+            {hit.occurred_at && <span>{formatDate(hit.occurred_at)}</span>}
             {hit.value != null && hit.value > 0 && (
               <span>AED {formatMoney(hit.value)}</span>
             )}
@@ -166,8 +165,7 @@ function InterpretedChips({
   for (const intent of interpreted.intents) {
     chips.push(INTENT_LABELS[intent] ?? intent);
   }
-  if (interpreted.terms)
-    chips.push(`"${interpreted.terms}"`);
+  if (interpreted.terms) chips.push(`"${interpreted.terms}"`);
   if (interpreted.date_from)
     chips.push(
       interpreted.date_from === interpreted.date_to
@@ -187,7 +185,11 @@ function InterpretedChips({
 
 function HistoryTable({ rows }: { rows: RetrievalHistoryRow[] }) {
   if (!rows.length)
-    return <p className="py-8 text-center text-sm text-text-muted">No recent queries.</p>;
+    return (
+      <p className="py-8 text-center text-sm text-text-muted">
+        No recent queries.
+      </p>
+    );
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full text-left text-sm">
@@ -212,7 +214,9 @@ function HistoryTable({ rows }: { rows: RetrievalHistoryRow[] }) {
                   : "—"}
               </td>
               <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
-                {row.response_time_ms != null ? `${row.response_time_ms} ms` : "—"}
+                {row.response_time_ms != null
+                  ? `${row.response_time_ms} ms`
+                  : "—"}
               </td>
               <td className="px-3 py-2 text-text-muted">
                 {row.log_timestamp ? formatDate(row.log_timestamp) : "—"}
@@ -250,6 +254,24 @@ export function RetrievalUI() {
   const [activeTab, setActiveTab] = useState<"results" | "history">("results");
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const hasLoadedHistoryRef = useRef(false);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const { data } = await api.get<RetrievalHistoryRow[]>(
+        "/api/v1/retrieval/history",
+        {
+          params: { limit: 50 }
+        }
+      );
+      setHistory(data);
+    } catch {
+      setHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
 
   async function runSearch(q: string) {
     if (!q.trim()) return;
@@ -261,26 +283,17 @@ export function RetrievalUI() {
     try {
       const params: Record<string, string> = { q, limit: "20" };
       if (source) params.sources = source;
-      const { data } = await api.get<RetrievalResponse>("/api/v1/retrieval/search", { params });
+      const { data } = await api.get<RetrievalResponse>(
+        "/api/v1/retrieval/search",
+        { params }
+      );
       setResult(data);
     } catch (err) {
-      setError(apiErrorMessage(err, "Search failed. Try rephrasing your query."));
+      setError(
+        apiErrorMessage(err, "Search failed. Try rephrasing your query.")
+      );
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function loadHistory() {
-    setHistoryLoading(true);
-    try {
-      const { data } = await api.get<RetrievalHistoryRow[]>("/api/v1/retrieval/history", {
-        params: { limit: 50 }
-      });
-      setHistory(data);
-    } catch {
-      setHistory([]);
-    } finally {
-      setHistoryLoading(false);
     }
   }
 
@@ -290,10 +303,16 @@ export function RetrievalUI() {
   }
 
   useEffect(() => {
-    if (activeTab === "history" && history === null && isAuthority) {
+    if (
+      activeTab === "history" &&
+      history === null &&
+      isAuthority &&
+      !hasLoadedHistoryRef.current
+    ) {
+      hasLoadedHistoryRef.current = true;
       loadHistory();
     }
-  }, [activeTab, history, isAuthority]);
+  }, [activeTab, history, isAuthority, loadHistory]);
 
   const totalHits = result?.hits.length ?? 0;
   const counts = result?.counts ?? {};
@@ -307,7 +326,8 @@ export function RetrievalUI() {
           Evidence Retrieval
         </h1>
         <p className="mt-1 text-sm text-text-secondary">
-          Natural-language or identifier query across properties, transactions, and documents.
+          Natural-language or identifier query across properties, transactions,
+          and documents.
         </p>
       </div>
 
@@ -328,13 +348,21 @@ export function RetrievalUI() {
             className={`${INPUT_CLASS} sm:w-44`}
           >
             {SOURCE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
           </select>
-          <button type="submit" disabled={loading || !queryText.trim()} className={BUTTON_PRIMARY}>
-            {loading
-              ? <Icons.HourglassEmpty className="h-4 w-4 animate-spin" />
-              : <Icons.Search className="h-4 w-4" />}
+          <button
+            type="submit"
+            disabled={loading || !queryText.trim()}
+            className={BUTTON_PRIMARY}
+          >
+            {loading ? (
+              <Icons.HourglassEmpty className="h-4 w-4 animate-spin" />
+            ) : (
+              <Icons.Search className="h-4 w-4" />
+            )}
             {loading ? "Searching…" : "Search"}
           </button>
         </div>
@@ -346,7 +374,10 @@ export function RetrievalUI() {
             <button
               key={ex}
               type="button"
-              onClick={() => { setQueryText(ex); runSearch(ex); }}
+              onClick={() => {
+                setQueryText(ex);
+                runSearch(ex);
+              }}
               className={BUTTON_GHOST}
             >
               {ex}
@@ -365,26 +396,48 @@ export function RetrievalUI() {
       {/* Tabs */}
       {(result || isAuthority) && (
         <div className="mb-4 flex gap-1 border-b border-border">
-          {(["results", "history"] as const).filter((t) => t === "results" || isAuthority).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === tab
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {tab === "results" ? "Results" : "Query history"}
-            </button>
-          ))}
+          {(["results", "history"] as const)
+            .filter((t) => t === "results" || isAuthority)
+            .map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === tab
+                    ? "border-b-2 border-primary text-primary"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {tab === "results" ? "Results" : "Query history"}
+              </button>
+            ))}
         </div>
       )}
 
       {/* Results tab */}
       {activeTab === "results" && result && (
         <div className="space-y-4">
+          {/* AI Natural Language Answer Panel */}
+          {result.ai_answer && (
+            <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 via-surface to-surface p-5 shadow-sm">
+              <div className="mb-2.5 flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/20 text-primary">
+                  <Icons.AutoAwesome className="h-4 w-4" />
+                </div>
+                <h3 className="text-sm font-bold text-text-primary">
+                  AI Natural Language Answer
+                </h3>
+                <span className="ml-auto inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                  NLP Processed
+                </span>
+              </div>
+              <p className="text-sm leading-relaxed text-text-primary whitespace-pre-wrap">
+                {result.ai_answer}
+              </p>
+            </div>
+          )}
+
           {/* Summary bar */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-surface-canvas px-4 py-3">
             <span className="text-sm font-semibold text-text-primary">
@@ -425,7 +478,9 @@ export function RetrievalUI() {
           {result.hits.length === 0 ? (
             <div className="rounded-xl border border-border bg-surface py-12 text-center">
               <Icons.FindInPage className="mx-auto mb-3 h-10 w-10 text-text-muted" />
-              <p className="text-sm font-medium text-text-primary">No evidence records found</p>
+              <p className="text-sm font-medium text-text-primary">
+                No evidence records found
+              </p>
               <p className="mt-1 text-xs text-text-secondary">
                 Try a different query, identifier, or source filter.
               </p>
@@ -444,9 +499,12 @@ export function RetrievalUI() {
       {activeTab === "results" && !result && !loading && !error && (
         <div className="rounded-xl border border-border bg-surface py-16 text-center">
           <Icons.FindInPage className="mx-auto mb-3 h-10 w-10 text-text-muted" />
-          <p className="text-sm font-medium text-text-primary">Enter a query above to retrieve evidence</p>
+          <p className="text-sm font-medium text-text-primary">
+            Enter a query above to retrieve evidence
+          </p>
           <p className="mt-1 text-xs text-text-secondary">
-            Search by identifier (transaction ID, title deed, property ID) or describe what you are looking for.
+            Search by identifier (transaction ID, title deed, property ID) or
+            describe what you are looking for.
           </p>
         </div>
       )}

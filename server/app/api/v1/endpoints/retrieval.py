@@ -128,6 +128,8 @@ def search(
         started_ms=started,
     )
 
+    ai_answer = retrieval_service.synthesize_retrieval_answer(q, result)
+
     return RetrievalResponse(
         query_id=query_id,
         interpreted=result["interpreted"],
@@ -136,6 +138,7 @@ def search(
         counts=result["counts"],
         warnings=result["warnings"],
         response_time_ms=elapsed,
+        ai_answer=ai_answer,
     )
 
 

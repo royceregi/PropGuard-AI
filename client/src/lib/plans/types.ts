@@ -119,4 +119,3 @@ export function getCommercialPlan(
   const key = planId.trim().toUpperCase();
   return COMMERCIAL_PLANS.find((plan) => plan.id === key);
 }
-

@@ -33,6 +33,10 @@ def list_hash_details(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    if current_user.access_level == "PUBLIC":
+        raise HTTPException(
+            status_code=403, detail="Blockchain verification is restricted for public users."
+        )
     allowed_ids = scoped_property_ids(db, current_user)
     if property_id:
         ensure_property_access(db, current_user, property_id)
@@ -72,6 +76,10 @@ def verify_transaction_hashes(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
+    if current_user.access_level == "PUBLIC":
+        raise HTTPException(
+            status_code=403, detail="Blockchain verification is restricted for public users."
+        )
     ensure_transaction_access(db, current_user, transaction_id)
     result = blockchain_hash_service.verify_transaction(db, transaction_id)
     if result is None:
@@ -86,6 +94,10 @@ def registry_checks(
     current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
 ):
     """Legal / business checks: wallets, ownership, parties, encumbrance, registration."""
+    if current_user.access_level == "PUBLIC":
+        raise HTTPException(
+            status_code=403, detail="Blockchain verification is restricted for public users."
+        )
     ensure_transaction_access(db, current_user, transaction_id)
     result = registry_checks_service.run_checks(db, transaction_id)
     if result is None:

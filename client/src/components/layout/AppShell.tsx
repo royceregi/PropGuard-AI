@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { SideNav } from "@/components/layout/SideNav";
 import { TopNav } from "@/components/layout/TopNav";
+import { UserNLPAssistantModal } from "@/components/assistant/UserNLPAssistantModal";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -33,6 +34,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         />
         <main className="min-h-0 flex-1 overflow-auto">{children}</main>
       </div>
+
+      <UserNLPAssistantModal />
     </div>
   );
 }

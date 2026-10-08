@@ -45,10 +45,10 @@ Demo logins (local only):
 
 | Access level | Email | Password |
 | --- | --- | --- |
-| SYSTEM | `admin@prop.ai` | `DemoAdmin#2026` |
-| REGISTRY | `registry@prop.ai` | `DemoRegistry#2026` |
-| COMPANY | `estate@prop.ai` | `DemoCompany#2026` |
-| PUBLIC | `user@prop.ai` | `DemoPublic#2026` |
+| SYSTEM | `admin@prop.ai` | `pass!123` |
+| REGISTRY | `registry@prop.ai` | `pass!123` |
+| COMPANY | `estate@prop.ai` | `pass!123` |
+| PUBLIC | `user@prop.ai` | `pass!123` |
 
 ## Property view APIs (read-only)
 
@@ -134,14 +134,22 @@ Payload commitment = SHA-256 of sorted-key JSON:
 
 ## AI / LLM env (optional)
 
-Used later by Report Agent / NL search. Edit `server/.env`:
+The LLM client supports OpenAI-compatible providers and independent model selection per
+agent. `AI_MODEL` is retained as the fallback for any agent-specific setting that is
+empty. Retrieval and Transaction Analysis are deterministic today; their model settings
+reserve the configuration needed for future LLM-assisted capabilities without allowing
+models to alter evidence or the authoritative risk score. Edit `server/.env`:
 
 | Variable | Purpose |
 | --- | --- |
 | `AI_ENABLED` | `true` when ready to call the model |
 | `AI_PROVIDER` | `gemini` \| `openai` \| `ollama` |
 | `AI_API_KEY` | Provider API key (leave empty for local Ollama if unused) |
-| `AI_MODEL` | Model id, e.g. `gemini-2.0-flash`, `gpt-4o-mini` |
+| `AI_MODEL` | Shared fallback model id |
+| `AI_RETRIEVAL_MODEL` | Retrieval Agent model override |
+| `AI_TRANSACTION_ANALYSIS_MODEL` | Transaction Analysis Agent model override |
+| `AI_RISK_MODEL` | Risk Agent model override |
+| `AI_REPORT_MODEL` | Report Agent model override |
 | `AI_BASE_URL` | Optional custom/base URL |
 | `AI_TEMPERATURE` | Sampling temperature |
 | `AI_MAX_TOKENS` | Max output tokens |

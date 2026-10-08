@@ -26,9 +26,9 @@ from sqlalchemy.orm import Session
 
 from app.agents.base import agent_output, log_run
 from app.core import llm
-from app.core.config import settings
 
 AGENT_NAME = "report_agent"
+MODEL = llm.model_for(AGENT_NAME)
 
 RESPONSIBLE_AI_NOTICE = (
     "This is an automated risk indicator report generated for land-registry investigation purposes. "
@@ -218,7 +218,10 @@ def run(
                 "verification_summary": report["verification_summary"],
             }
             reply = llm.chat_json(
-                _SYSTEM_PROMPT, f"Investigation Data:\n{json.dumps(ctx, default=str)}"
+                _SYSTEM_PROMPT,
+                f"Investigation Data:\n{json.dumps(ctx, default=str)}",
+                model=MODEL,
+                agent_name=AGENT_NAME,
             )
             exec_s = str(reply.get("executive_summary") or "").strip()
             recom = str(reply.get("recommendation") or "").strip()
@@ -226,7 +229,7 @@ def run(
                 report["executive_summary"] = _clean_banned(exec_s)
             if recom:
                 report["recommendation"] = _clean_banned(recom)
-            report["generated_by"] = settings.AI_MODEL
+            report["generated_by"] = MODEL
         except Exception as exc:
             warnings.append(f"AI report generation unavailable, used template prose ({exc}).")
 

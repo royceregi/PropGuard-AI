@@ -104,9 +104,23 @@ def share_property_with_buyer(
             status_code=403, detail="Only the current property owner can share this property"
         )
 
-    buyer = db.query(UserModel).filter(UserModel.user_id == payload.buyer_user_id.strip()).first()
+    target_ident = payload.buyer_user_id.strip()
+    buyer = (
+        db.query(UserModel)
+        .filter(
+            or_(
+                UserModel.user_id == target_ident,
+                UserModel.email == target_ident.lower(),
+                UserModel.username == target_ident,
+            )
+        )
+        .first()
+    )
     if buyer is None or not getattr(buyer, "user_id", None):
-        raise HTTPException(status_code=404, detail="Target buyer user not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Target buyer '{target_ident}' not found by User ID, email, or username",
+        )
 
     expires_at = None
     if payload.expires_in_days:

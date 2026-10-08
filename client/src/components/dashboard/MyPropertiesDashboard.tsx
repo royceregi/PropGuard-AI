@@ -5,6 +5,7 @@ import Link from "next/link";
 import { isAxiosError } from "axios";
 import { Icons } from "@/components/icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { SharePropertyModal } from "@/components/property-search/SharePropertyModal";
 import { api } from "@/lib/api/client";
 import {
   propertyHref,
@@ -21,6 +22,13 @@ export function MyPropertiesDashboard() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<"all" | "owned" | "shared">(
+    "all"
+  );
+  const [shareTarget, setShareTarget] = useState<{
+    propertyId: string;
+    propertyName: string;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,21 +70,30 @@ export function MyPropertiesDashboard() {
     };
   }, []);
 
+  const filteredItems = items.filter((item) => {
+    if (filterType === "owned") return item.is_current_owner;
+    if (filterType === "shared") return !item.is_current_owner;
+    return true;
+  });
+  const ownedCount = items.filter((item) => item.is_current_owner).length;
+  const sharedCount = items.filter((item) => !item.is_current_owner).length;
+
   return (
     <div className="space-y-6 p-3 sm:p-4 lg:p-6 xl:p-8">
       <header className="space-y-2">
         <h2 className="text-xl font-bold tracking-tight text-text-primary sm:text-2xl">
           My Properties
         </h2>
-        <p className="max-w-2xl text-sm text-text-secondary">
-          View details, ownership history, and encumbrances for properties you
-          own or that were shared with you on a transaction. You can request a
-          risk assessment and evidence report for those properties only;
-          official records stay read-only.
-        </p>
       </header>
 
       <div className="flex flex-wrap gap-3">
+        <Link
+          href="/shared-properties"
+          className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-text-primary transition-colors hover:bg-surface-subtle"
+        >
+          <Icons.FolderOpen className="h-[18px] w-[18px] text-primary" />
+          Shared Properties Inbox / Outbox
+        </Link>
         <Link
           href="/property-search"
           className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-medium text-text-primary transition-colors hover:bg-surface-subtle"
@@ -94,14 +111,55 @@ export function MyPropertiesDashboard() {
       </div>
 
       <section className="rounded-xl border border-border bg-surface p-5 md:p-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-text-primary">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
             <Icons.LocationCity className="h-[22px] w-[22px] text-text-muted" />
-            Related properties
-          </h3>
-          {!loading ? (
-            <span className="text-xs text-text-muted">{total} total</span>
-          ) : null}
+            <h3 className="text-lg font-bold text-text-primary">
+              Property Records
+            </h3>
+            {!loading && (
+              <span className="text-xs text-text-muted">
+                ({filteredItems.length} listed)
+              </span>
+            )}
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 rounded-lg bg-surface-subtle p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setFilterType("all")}
+              className={`rounded-md px-3 py-1 font-semibold transition-colors ${
+                filterType === "all"
+                  ? "bg-surface text-text-primary shadow-xs"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              All ({total})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType("owned")}
+              className={`rounded-md px-3 py-1 font-semibold transition-colors ${
+                filterType === "owned"
+                  ? "bg-surface text-text-primary shadow-xs"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              Your Owned ({ownedCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType("shared")}
+              className={`rounded-md px-3 py-1 font-semibold transition-colors ${
+                filterType === "shared"
+                  ? "bg-surface text-text-primary shadow-xs"
+                  : "text-text-muted hover:text-text-primary"
+              }`}
+            >
+              Shared / Due Diligence ({sharedCount})
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -110,30 +168,65 @@ export function MyPropertiesDashboard() {
           <p role="alert" className="text-sm text-danger">
             {error}
           </p>
-        ) : items.length === 0 ? (
-          <div className="space-y-3">
+        ) : filteredItems.length === 0 ? (
+          <div className="space-y-3 p-4 text-center">
             <p className="text-sm text-text-muted">
-              No properties are linked to your account yet as owner, ownership
-              history, or transaction party (shared).
+              {filterType === "owned"
+                ? "You have no properties recorded under your primary ownership."
+                : filterType === "shared"
+                  ? "No properties have been shared with your account yet."
+                  : "No properties are linked to your account yet as owner or shared transaction party."}
             </p>
-            <p className="text-sm text-text-secondary">
-              When another party shares a property with you on a transaction, it
-              will appear here. You cannot browse unrelated properties.
-            </p>
+            {filterType === "shared" && (
+              <Link
+                href="/shared-properties"
+                className="inline-flex text-xs font-semibold text-primary hover:underline"
+              >
+                Go to Shared Properties Inbox →
+              </Link>
+            )}
           </div>
         ) : (
           <ul className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
-            {items.map((property) => (
-              <PropertyRow key={property.property_id} property={property} />
+            {filteredItems.map((property) => (
+              <PropertyRow
+                key={property.property_id}
+                property={property}
+                onShare={(p) => {
+                  const title =
+                    p.property_name?.trim() ||
+                    p.title_deed_number?.trim() ||
+                    p.property_id;
+                  setShareTarget({
+                    propertyId: p.property_id,
+                    propertyName: title
+                  });
+                }}
+              />
             ))}
           </ul>
         )}
       </section>
+
+      {shareTarget && (
+        <SharePropertyModal
+          propertyId={shareTarget.propertyId}
+          propertyName={shareTarget.propertyName}
+          open={Boolean(shareTarget)}
+          onClose={() => setShareTarget(null)}
+        />
+      )}
     </div>
   );
 }
 
-function PropertyRow({ property }: { property: UserRelatedProperty }) {
+function PropertyRow({
+  property,
+  onShare
+}: {
+  property: UserRelatedProperty;
+  onShare: (property: UserRelatedProperty) => void;
+}) {
   const title =
     property.property_name?.trim() ||
     property.title_deed_number?.trim() ||
@@ -164,10 +257,20 @@ function PropertyRow({ property }: { property: UserRelatedProperty }) {
         </div>
         <div className="flex flex-wrap gap-1.5">
           {property.is_current_owner ? (
-            <StatusBadge label="Current owner" variant="success" size="sm" />
-          ) : null}
+            <StatusBadge
+              label="Your Owned Property"
+              variant="success"
+              size="sm"
+            />
+          ) : (
+            <StatusBadge label="Shared / Associated" variant="info" size="sm" />
+          )}
           {property.in_ownership_history ? (
-            <StatusBadge label="Ownership history" variant="info" size="sm" />
+            <StatusBadge
+              label="Ownership history"
+              variant="neutral"
+              size="sm"
+            />
           ) : null}
           {property.in_transactions ? (
             <StatusBadge
@@ -197,7 +300,17 @@ function PropertyRow({ property }: { property: UserRelatedProperty }) {
         )}
       </div>
 
-      <div className="flex shrink-0 flex-wrap gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {property.is_current_owner && (
+          <button
+            type="button"
+            onClick={() => onShare(property)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text-primary transition-colors hover:bg-surface-subtle"
+          >
+            <Icons.Send className="h-4 w-4 text-primary" />
+            Share with Buyer
+          </button>
+        )}
         <Link
           href={propertyHref(property.property_id)}
           className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text-primary transition-colors hover:bg-surface-subtle"

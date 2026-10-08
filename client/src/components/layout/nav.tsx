@@ -11,6 +11,7 @@ export type NavItemId =
   | "risk_analysis"
   | "investigation_reports"
   | "audit_trail"
+  | "shared_properties"
   | "users"
   | "settings";
 
@@ -42,14 +43,14 @@ export const navItems: NavItem[] = [
     href: "/transactions",
     label: "Transactions",
     badge: null,
-    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
+    levels: ["SYSTEM", "REGISTRY", "COMPANY"]
   },
   {
     id: "blockchain_verification",
     href: "/blockchain-verification",
     label: "Blockchain Verification",
     badge: null,
-    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
+    levels: ["SYSTEM", "REGISTRY", "COMPANY"]
   },
   {
     id: "ai_investigation",
@@ -78,6 +79,13 @@ export const navItems: NavItem[] = [
     label: "Audit Trail",
     badge: null,
     levels: ["SYSTEM", "REGISTRY"]
+  },
+  {
+    id: "shared_properties",
+    href: "/shared-properties",
+    label: "Shared Properties",
+    badge: null,
+    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
   },
   {
     id: "users",
@@ -123,12 +131,20 @@ export function getPageTitle(pathname: string): string {
     return "Profile";
   }
 
+  if (pathname.startsWith("/notifications")) {
+    return "Notifications";
+  }
+
   if (pathname.startsWith("/property-search/")) {
     return "Property Details";
   }
 
   if (pathname.startsWith("/transactions/")) {
     return "Transaction Details";
+  }
+
+  if (pathname.startsWith("/shared-properties")) {
+    return "Shared Properties";
   }
 
   const exact = navItems.find((item) => item.href === pathname);

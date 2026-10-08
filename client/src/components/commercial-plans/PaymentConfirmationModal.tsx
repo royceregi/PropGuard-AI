@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Icons } from "@/components/icons";
 import type { CommercialPlan } from "@/lib/plans/types";
 
@@ -23,12 +23,14 @@ export function PaymentConfirmationModal({
 }: PaymentConfirmationModalProps) {
   const termsId = useId();
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const prevPlanIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (open) {
+    if (open && plan?.id !== prevPlanIdRef.current) {
       setAgreedToTerms(false);
+      prevPlanIdRef.current = plan?.id ?? null;
     }
-  }, [open, plan]);
+  }, [open, plan?.id]);
 
   useEffect(() => {
     if (!open) {
@@ -205,4 +207,3 @@ export function PaymentConfirmationModal({
     </div>
   );
 }
-

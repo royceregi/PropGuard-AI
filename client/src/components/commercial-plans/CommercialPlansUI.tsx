@@ -24,7 +24,6 @@ export function CommercialPlansUI() {
   const token = useAuthStore((state) => state.token);
 
   const [plans, setPlans] = useState<CommercialPlan[]>(COMMERCIAL_PLANS);
-  const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<CommercialPlan | null>(null);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [termsModalOpen, setTermsModalOpen] = useState(false);
@@ -36,7 +35,6 @@ export function CommercialPlansUI() {
 
     async function loadPlans() {
       try {
-        setLoading(true);
         const { data } = await api.get<PlanListResponse>(
           "/api/v1/subscription/plans"
         );
@@ -45,10 +43,6 @@ export function CommercialPlansUI() {
         }
       } catch {
         // Fall back to preconfigured plans
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
       }
     }
 
@@ -271,4 +265,3 @@ export function CommercialPlansUI() {
     </div>
   );
 }
-

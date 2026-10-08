@@ -2,7 +2,13 @@
 
 export type RetrievalHit = {
   evidence_id: string;
-  source: "property" | "transaction" | "document" | "ownership" | "assessment" | string;
+  source:
+    | "property"
+    | "transaction"
+    | "document"
+    | "ownership"
+    | "assessment"
+    | string;
   record_id: string;
   rank: number;
   relevance_score: number;
@@ -38,6 +44,7 @@ export type RetrievalResponse = {
   counts: Record<string, number>;
   warnings: string[];
   response_time_ms: number;
+  ai_answer?: string | null;
 };
 
 export type RetrievalHistoryRow = {
@@ -56,7 +63,7 @@ export const INTENT_LABELS: Record<string, string> = {
   high_value: "High-value transactions",
   hash_mismatch: "Document hash mismatches",
   rapid_ownership_change: "Rapid ownership changes",
-  high_risk: "High-risk assessments",
+  high_risk: "High-risk assessments"
 };
 
 export const SOURCE_LABELS: Record<string, string> = {
@@ -64,7 +71,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   transaction: "Transaction",
   document: "Document",
   ownership: "Ownership",
-  assessment: "Risk assessment",
+  assessment: "Risk assessment"
 };
 
 export const SOURCE_ICON: Record<string, string> = {
@@ -72,25 +79,37 @@ export const SOURCE_ICON: Record<string, string> = {
   transaction: "swap",
   document: "doc",
   ownership: "history",
-  assessment: "risk",
+  assessment: "risk"
 };
 
 export function matchLabel(match: string): string {
   switch (match) {
-    case "identifier": return "Exact";
-    case "related": return "Related";
-    case "intent": return "Pattern";
-    case "full_text": return "Full-text";
-    case "full_text_any": return "Full-text (partial)";
-    default: return match;
+    case "identifier":
+      return "Exact";
+    case "related":
+      return "Related";
+    case "intent":
+      return "Pattern";
+    case "full_text":
+      return "Full-text";
+    case "full_text_any":
+      return "Full-text (partial)";
+    default:
+      return match;
   }
 }
 
-export function matchVariant(match: string): "success" | "info" | "neutral" | "warning" {
+export function matchVariant(
+  match: string
+): "success" | "info" | "neutral" | "warning" {
   switch (match) {
-    case "identifier": return "success";
-    case "related": return "info";
-    case "intent": return "warning";
-    default: return "neutral";
+    case "identifier":
+      return "success";
+    case "related":
+      return "info";
+    case "intent":
+      return "warning";
+    default:
+      return "neutral";
   }
 }

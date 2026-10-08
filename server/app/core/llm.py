@@ -18,6 +18,19 @@ class LLMError(RuntimeError):
     pass
 
 
+def model_for(agent_name: str | None = None) -> str:
+    """Return an agent-specific model, falling back to the shared model."""
+    model_settings = {
+        "blockchain_retrieval_agent": "AI_RETRIEVAL_MODEL",
+        "transaction_analysis_agent": "AI_TRANSACTION_ANALYSIS_MODEL",
+        "risk_detection_agent": "AI_RISK_MODEL",
+        "report_agent": "AI_REPORT_MODEL",
+    }
+    setting_name = model_settings.get(agent_name or "")
+    configured_model = getattr(settings, setting_name, "") if setting_name else ""
+    return configured_model.strip() or settings.AI_MODEL
+
+
 def is_enabled() -> bool:
     return bool(
         settings.AI_ENABLED
@@ -50,12 +63,18 @@ def _parse_json(content: str) -> dict[str, Any]:
     return parsed
 
 
-def chat_json(system: str, user: str) -> dict[str, Any]:
+def chat_json(
+    system: str,
+    user: str,
+    *,
+    model: str | None = None,
+    agent_name: str | None = None,
+) -> dict[str, Any]:
     """Send one system + user message and return the model's JSON object reply."""
     if not is_enabled():
         raise LLMError("AI is disabled")
     payload = {
-        "model": settings.AI_MODEL,
+        "model": model or model_for(agent_name),
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         "temperature": settings.AI_TEMPERATURE,
         "max_tokens": settings.AI_MAX_TOKENS,
