@@ -43,3 +43,22 @@ class ChangePasswordRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     detail: str
+
+
+class RegisterRequest(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=255)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+    username: str | None = Field(default=None, min_length=3, max_length=100)
+    phone_number: str | None = Field(default=None, max_length=50)
+    nic: str | None = Field(default=None, min_length=5, max_length=32)
+
+
+class RegisterResponse(BaseModel):
+    user_id: str
+    email: str
+    full_name: str | None
+    access_level: str
+    kyc_status: str
+    is_active: bool
+    message: str

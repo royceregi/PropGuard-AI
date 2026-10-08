@@ -7,6 +7,7 @@ import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Icons } from "@/components/icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CopyableHashBox } from "@/components/ui/CopyableHashBox";
+import { SharePropertyModal } from "@/components/property-search/SharePropertyModal";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api/client";
 import {
@@ -25,10 +26,11 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
   const { user } = useAuth();
   const canRequestRisk =
     user?.access_level === "PUBLIC" || user?.access_level === "COMPANY";
-  const canVerify = Boolean(user);
+  const canVerify = Boolean(user && user.access_level !== "PUBLIC");
   const [property, setProperty] = useState<PropertyDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,12 +118,40 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
   });
   const documents = property.documents ?? [];
 
+  const isOwner = Boolean(
+    user &&
+    (user.user_id === property.current_owner_id ||
+      (property.current_owner &&
+        user.user_id === property.current_owner.user_id))
+  );
+  const isAuthority = Boolean(
+    user &&
+    (user.access_level === "SYSTEM" ||
+      user.access_level === "REGISTRY" ||
+      user.access_level === "COMPANY")
+  );
+  const isSharedProperty = Boolean(
+    user && user.access_level === "PUBLIC" && !isOwner
+  );
+  const canViewTransactionsNav = Boolean(
+    user && user.access_level !== "PUBLIC"
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <Breadcrumbs
           items={[
-            { label: "Property Search", href: "/property-search" },
+            {
+              label:
+                user?.access_level === "PUBLIC"
+                  ? "My Properties"
+                  : "Property Search",
+              href:
+                user?.access_level === "PUBLIC"
+                  ? "/dashboard/my-properties"
+                  : "/property-search"
+            },
             { label: displayId }
           ]}
           className="mb-4"
@@ -152,12 +182,22 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
                 icon={<Icons.Gavel />}
                 size="md"
               />
-              <StatusBadge
-                label="Risk N/A"
-                variant="neutral"
-                icon={<Icons.GppMaybe />}
-                size="md"
-              />
+              {isOwner && (
+                <StatusBadge
+                  label="Your Owned Property"
+                  variant="success"
+                  icon={<Icons.AccountBalance />}
+                  size="md"
+                />
+              )}
+              {isSharedProperty && (
+                <StatusBadge
+                  label="Shared with You (Due Diligence)"
+                  variant="info"
+                  icon={<Icons.FolderOpen />}
+                  size="md"
+                />
+              )}
             </div>
             <p className="mt-2 font-mono text-xs break-all text-text-muted">
               {property.property_id}
@@ -173,6 +213,16 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
                 Verify Blockchain
               </Link>
             ) : null}
+            {isOwner || isAuthority ? (
+              <button
+                type="button"
+                onClick={() => setShareModalOpen(true)}
+                className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 font-medium text-text-primary transition-colors hover:bg-surface-subtle"
+              >
+                <Icons.Send className="h-[18px] w-[18px] text-primary" />
+                Share with Buyer
+              </button>
+            ) : null}
             {canRequestRisk ? (
               <Link
                 href={`/risk-analysis?property_id=${encodeURIComponent(property.property_id)}`}
@@ -181,20 +231,35 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
                 <Icons.GppMaybe className="h-[18px] w-[18px]" />
                 Request Risk Assessment
               </Link>
-            ) : (
-              <button
-                type="button"
-                disabled
-                title="AI investigation coming later"
-                className="flex h-10 cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-primary px-4 font-medium text-white opacity-60"
+            ) : property.transactions?.[0]?.transaction_id ? (
+              <Link
+                href={`/ai-investigation?transaction_id=${encodeURIComponent(property.transactions[0].transaction_id)}`}
+                className="flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 font-medium text-white transition-colors hover:bg-primary-hover"
               >
                 <Icons.AutoAwesome className="h-[18px] w-[18px]" />
                 Run AI Investigation
-              </button>
-            )}
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>
+
+      {isSharedProperty && (
+        <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-xs text-text-secondary">
+          <Icons.Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div>
+            <p className="font-semibold text-text-primary">
+              Shared Property Due Diligence
+            </p>
+            <p className="mt-0.5">
+              This property has been shared with you by the registered owner for
+              pre-transaction due diligence. All official land registry and
+              blockchain records are read-only. You can verify the blockchain
+              ledger or request an AI risk assessment before proceeding.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
@@ -350,12 +415,18 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
                     className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
-                      <Link
-                        href={`/transactions/${encodeURIComponent(tx.transaction_id)}`}
-                        className="font-mono text-sm text-link hover:text-link-hover"
-                      >
-                        {shortenId(tx.transaction_id, 8, 6)}
-                      </Link>
+                      {canViewTransactionsNav ? (
+                        <Link
+                          href={`/transactions/${encodeURIComponent(tx.transaction_id)}`}
+                          className="font-mono text-sm text-link hover:text-link-hover"
+                        >
+                          {shortenId(tx.transaction_id, 8, 6)}
+                        </Link>
+                      ) : (
+                        <span className="font-mono text-sm font-semibold text-text-primary">
+                          {shortenId(tx.transaction_id, 8, 6)}
+                        </span>
+                      )}
                       <p className="text-xs text-text-muted">
                         {tx.registration_type ||
                           tx.transaction_group ||
@@ -488,6 +559,13 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
           </section>
         </div>
       </div>
+
+      <SharePropertyModal
+        propertyId={property.property_id}
+        propertyName={title}
+        open={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+      />
     </div>
   );
 }

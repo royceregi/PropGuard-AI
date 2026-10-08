@@ -31,3 +31,4 @@ class RetrievalResponse(BaseModel):
     counts: dict[str, int]
     warnings: list[str]
     response_time_ms: int
+    ai_answer: str | None = None

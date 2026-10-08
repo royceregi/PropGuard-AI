@@ -3,10 +3,10 @@ import { CommercialPlansUI } from "@/components/commercial-plans/CommercialPlans
 
 export const metadata: Metadata = {
   title: "Commercial Plans · PropGuard AI",
-  description: "Select a commercial subscription plan to activate your PropGuard account."
+  description:
+    "Select a commercial subscription plan to activate your PropGuard account."
 };
 
 export default function CustomerPlansPage() {
   return <CommercialPlansUI />;
 }
-

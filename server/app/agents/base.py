@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.llm import model_for
 from app.models.risk_assessment import AgentRun
 
 logger = logging.getLogger(__name__)
@@ -23,9 +24,11 @@ def agent_output(
     findings: dict[str, Any],
     evidence_ids: list[str],
     warnings: list[str],
+    model: str | None = None,
 ) -> dict[str, Any]:
     return {
         "agent_name": agent_name,
+        "model": model or model_for(agent_name),
         "status": status,
         "confidence_score": round(confidence_score, 2),
         "findings": findings,

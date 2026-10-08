@@ -913,3 +913,110 @@ def search(
         "counts": counts,
         "warnings": warnings,
     }
+
+
+def synthesize_retrieval_answer(query: str, result: dict[str, Any]) -> str:
+    """Generate a direct natural language answer for the user's query and retrieved evidence."""
+    from app.core import llm
+
+    hits = result.get("hits", [])
+    interpreted = result.get("interpreted", {})
+    intents = interpreted.get("intents", [])
+    clean_q = query.strip()
+
+    if not hits:
+        terms = interpreted.get("terms", "")
+        if terms:
+            return (
+                f"No matching property or transaction records were found for '{terms}'. "
+                "Try searching by property ID, district name (e.g. 'Dubai Marina'), or a broader keyword."
+            )
+        return (
+            f"No matching records were found for your query '{clean_q}'. "
+            "Please check the identifier or rephrase with general terms."
+        )
+
+    # 1. Try LLM synthesis if enabled
+    if llm.is_enabled():
+        try:
+            records_summary = []
+            for h in hits[:6]:
+                val_str = f" | Value: AED {h['value']:,.2f}" if h.get("value") else ""
+                date_str = f" | Date: {h['occurred_at']}" if h.get("occurred_at") else ""
+                records_summary.append(
+                    f"- [{h.get('source', '').upper()}] {h.get('title', '')} ({h.get('subtitle', '')}){val_str}{date_str} (Relevance: {int(h.get('relevance_score', 0) * 100)}%)"
+                )
+            context_block = "\n".join(records_summary)
+
+            system_prompt = (
+                "You are PropGuard AI's intelligent Property and Transaction Analyst. "
+                "The user entered a natural language query or thought. Answer it directly, clearly, "
+                "and factually using ONLY the retrieved records provided below. "
+                "Give a direct, concise, natural language answer (2-4 sentences or clear bullet points) "
+                "citing specific values, locations, and IDs where applicable."
+            )
+            user_prompt = (
+                f"User Query: {clean_q}\n\n"
+                f"Retrieved Records:\n{context_block}\n\n"
+                'Return a JSON object: {"answer": "Your direct natural language answer"}'
+            )
+            llm_res = llm.chat_json(system_prompt, user_prompt)
+            if isinstance(llm_res, dict) and llm_res.get("answer"):
+                return str(llm_res["answer"])
+        except Exception:
+            pass
+
+    # 2. Deterministic NLP synthesis fallback
+    top = hits[0]
+    total = len(hits)
+    q_low = clean_q.lower()
+
+    if "high_value" in intents or any(
+        k in q_low for k in ["high-value", "high value", "expensive", "largest"]
+    ):
+        top_vals = [f"AED {h['value']:,.2f} ({h['title']})" for h in hits if h.get("value")][:3]
+        vals_text = ", ".join(top_vals) if top_vals else "multiple top transactions"
+        return (
+            f"Retrieved {total} high-value transaction record(s). "
+            f"Top transactions include: {vals_text}. "
+            f"The highest single transaction recorded in this query is {top['title']}."
+        )
+
+    if "hash_mismatch" in intents or any(k in q_low for k in ["mismatch", "tamper", "broken"]):
+        return (
+            f"Found {total} record(s) with cryptographic hash integrity flags or mismatches. "
+            f"Primary flagged item is {top['title']}. "
+            f"Review the individual evidence cards below to inspect mismatched document hashes and broken block links."
+        )
+
+    if "previous_owners" in intents or any(
+        k in q_low for k in ["previous owner", "former owner", "past owner", "who owned"]
+    ):
+        owners_summary = [f"{h['title']} ({h.get('occurred_at') or 'Recorded'})" for h in hits[:4]]
+        return (
+            f"Retrieved ownership history records for this inquiry. "
+            f"Historical transfers on record: {'; '.join(owners_summary)}."
+        )
+
+    if "rapid_ownership_change" in intents or any(
+        k in q_low for k in ["rapid", "frequent", "flips"]
+    ):
+        return (
+            f"Identified {total} rapid ownership transfer events matching your query. "
+            f"These properties underwent multiple recorded transfers within short intervals. "
+            f"Lead property: {top['title']} ({top.get('subtitle') or ''})."
+        )
+
+    if "high_risk" in intents or any(k in q_low for k in ["high risk", "suspicious", "flagged"]):
+        return (
+            f"Retrieved {total} record(s) flagged for elevated risk. "
+            f"Top flagged case: {top['title']}. "
+            f"Review the risk indicators and cryptographic ledger flags on each transaction below."
+        )
+
+    top_items = [f"'{h['title']}' ({h.get('subtitle') or h.get('source')})" for h in hits[:3]]
+    return (
+        f"Found {total} record(s) relevant to '{clean_q}'. "
+        f"Top matches: {', '.join(top_items)}. "
+        f"Details, values, and evidence records are listed below."
+    )

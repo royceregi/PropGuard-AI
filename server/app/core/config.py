@@ -19,11 +19,15 @@ class Settings(BaseSettings):
     REGISTRY_SIGNING_KEY: str = ""
     REGISTRY_PUBLIC_KEY: str = ""
 
-    # AI / LLM (Report Agent, NL search — fill in .env; unused until agents are wired)
+    # AI / LLM. AI_MODEL remains the shared fallback for omitted agent-specific settings.
     AI_ENABLED: bool = False
-    AI_PROVIDER: str = "gemini"  # gemini | openai | ollama
+    AI_PROVIDER: str = "gemini"  # gemini | openai | ollama | openrouter
     AI_API_KEY: str = ""
     AI_MODEL: str = "gemini-2.0-flash"
+    AI_RETRIEVAL_MODEL: str = ""
+    AI_TRANSACTION_ANALYSIS_MODEL: str = ""
+    AI_RISK_MODEL: str = ""
+    AI_REPORT_MODEL: str = ""
     AI_BASE_URL: str = ""  # optional; e.g. OpenAI-compatible or Ollama URL
     AI_TEMPERATURE: float = 0.2
     AI_MAX_TOKENS: int = 2048

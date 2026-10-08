@@ -117,3 +117,40 @@ def test_investigation_not_found():
             assert res.status_code == 404
     finally:
         app.dependency_overrides.clear()
+
+
+def test_get_investigation_by_query_id():
+    user = mock_user("USR-REG", "REGISTRY")
+    app.dependency_overrides[get_current_user] = lambda: user
+
+    db = MagicMock()
+    mock_log = MagicMock()
+    mock_log.query_id = "INV-CA142E40"
+    mock_log.user_id = "SYS000001"
+    mock_log.query_text = "investigate:1-41-2023-5616"
+    mock_log.agent_used = "orchestrator"
+    mock_log.confidence_score = 0.67
+    mock_log.relevance_score = 0.85
+    mock_log.flagged_suspicious = False
+    mock_log.response_time_ms = 8498
+    mock_log.agent_response = "Clean title check."
+    mock_log.log_timestamp = None
+
+    db.query.return_value.filter.return_value.first.return_value = mock_log
+    db.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+    app.dependency_overrides[get_db] = lambda: db
+
+    try:
+        res = client.get("/api/v1/investigations/query/INV-CA142E40")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["query_id"] == "INV-CA142E40"
+        assert data["user_id"] == "SYS000001"
+        assert data["confidence_score"] == 0.67
+
+        # Test alias endpoint
+        res_alias = client.get("/api/v1/investigations/INV-CA142E40")
+        assert res_alias.status_code == 200
+        assert res_alias.json()["query_id"] == "INV-CA142E40"
+    finally:
+        app.dependency_overrides.clear()

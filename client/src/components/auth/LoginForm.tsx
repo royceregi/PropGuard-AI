@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { Icons } from "@/components/icons";
 import { useAuth } from "@/hooks/useAuth";
 import { canAccessPath, homeForAccessLevel } from "@/lib/auth/roles";
@@ -19,15 +19,23 @@ export function LoginForm() {
   const passwordId = useId();
   const rememberId = useId();
 
-  const [email, setEmail] = useState(() => readRememberedEmail());
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(() => hasRememberedEmail());
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [emailTouched, setEmailTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const rememberedEmail = readRememberedEmail();
+    // Browser storage must be read after the server-rendered initial state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEmail(rememberedEmail);
+    setRememberMe(rememberedEmail.length > 0);
+  }, []);
 
   const emailError = getEmailError(email);
   const passwordError = getPasswordError(password);
@@ -256,8 +264,4 @@ function readRememberedEmail(): string {
     return "";
   }
   return window.localStorage.getItem(REMEMBER_KEY) ?? "";
-}
-
-function hasRememberedEmail(): boolean {
-  return readRememberedEmail().length > 0;
 }

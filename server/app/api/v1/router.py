@@ -17,6 +17,7 @@ from app.api.v1.endpoints import (
     retrieval,
     risk_assessments,
     subscription,
+    user_assistant,
     users,
 )
 
@@ -89,4 +90,9 @@ api_router.include_router(
     investigations.router,
     prefix="/investigations",
     tags=["investigations"],
+)
+api_router.include_router(
+    user_assistant.router,
+    prefix="/user-assistant",
+    tags=["user-assistant"],
 )

@@ -24,10 +24,17 @@ import {
   type RiskLevel
 } from "@/lib/blockchain/risk";
 
-const LEVEL_VARIANT: Record<RiskLevel, StatusBadgeVariant> = {
+export const LEVEL_VARIANT: Record<RiskLevel, StatusBadgeVariant> = {
   LOW: "success",
   MEDIUM: "warning",
   HIGH: "error"
+};
+
+/** Snapshot of the panel state shared with derived cards. */
+export type BlockchainRiskState = {
+  assessment: BlockchainRiskAssessment | null;
+  loading: boolean;
+  running: boolean;
 };
 
 function formatValue(value: unknown): string {

@@ -72,6 +72,69 @@ def test_public_buyer_forbidden_on_admin_hash_maintenance():
         app.dependency_overrides.clear()
 
 
+def test_public_buyer_forbidden_on_blockchain_verification():
+    buyer = mock_buyer_user("BUYER-001")
+    app.dependency_overrides[get_current_user] = lambda: buyer
+    app.dependency_overrides[get_db] = lambda: make_mock_db()
+
+    try:
+        endpoints = [
+            "/api/v1/blockchain/verify/TX001",
+            "/api/v1/blockchain/checks/TX001",
+            "/api/v1/blockchain/hash-details",
+        ]
+        for ep in endpoints:
+            res = client.get(ep)
+            assert res.status_code == 403, f"Expected 403 on {ep}, got {res.status_code}"
+
+        res_post = client.post(
+            "/api/v1/blockchain-transactions/verify",
+            json={
+                "property_id": "P001",
+                "transaction_id": "TX001",
+                "transaction_type": "SALE",
+                "transaction_datetime": "2024-01-01T00:00:00",
+                "transaction_value": 1000000,
+                "currency": "AED",
+                "from_wallet": "0x1111111111111111111111111111111111111111",
+                "to_wallet": "0x2222222222222222222222222222222222222222",
+                "title_deed_number": "TD-001",
+                "address": "Address",
+                "district": "District",
+                "city": "Dubai",
+                "land_area": 1000,
+                "area_unit": "SQ_METER",
+                "land_type": "RESIDENTIAL",
+                "survey_plan_number": "SP-001",
+                "current_usage_type": "RESIDENTIAL",
+                "current_subtype": "APARTMENT",
+            },
+        )
+        assert res_post.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_public_buyer_can_query_user_assistant():
+    buyer = mock_buyer_user("BUYER-001")
+    app.dependency_overrides[get_current_user] = lambda: buyer
+    app.dependency_overrides[get_db] = lambda: make_mock_db()
+
+    try:
+        res = client.post(
+            "/api/v1/user-assistant/query", json={"question": "What is my property value?"}
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert "query_id" in data
+        assert "answer" in data
+
+        res_hist = client.get("/api/v1/user-assistant/history")
+        assert res_hist.status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_public_buyer_forbidden_on_user_management():
     buyer = mock_buyer_user("BUYER-001")
     app.dependency_overrides[get_current_user] = lambda: buyer

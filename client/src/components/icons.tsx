@@ -38,6 +38,7 @@ import ChevronLeft from "@mui/icons-material/ChevronLeft";
 import ChevronRight from "@mui/icons-material/ChevronRight";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import DarkModeOutlined from "@mui/icons-material/DarkModeOutlined";
+import DeleteOutlined from "@mui/icons-material/DeleteOutlined";
 import FileDownloadOutlined from "@mui/icons-material/FileDownloadOutlined";
 import FilterListOutlined from "@mui/icons-material/FilterListOutlined";
 import LinkOutlined from "@mui/icons-material/LinkOutlined";
@@ -64,6 +65,11 @@ import VisibilityOffOutlined from "@mui/icons-material/VisibilityOffOutlined";
 import OpenInNewOutlined from "@mui/icons-material/OpenInNewOutlined";
 import LockOpenOutlined from "@mui/icons-material/LockOpenOutlined";
 import SyncOutlined from "@mui/icons-material/SyncOutlined";
+import PaymentOutlined from "@mui/icons-material/PaymentOutlined";
+import QueryStatsOutlined from "@mui/icons-material/QueryStatsOutlined";
+import FolderOpenOutlined from "@mui/icons-material/FolderOpenOutlined";
+import InfoOutlined from "@mui/icons-material/InfoOutlined";
+import WarningOutlined from "@mui/icons-material/WarningOutlined";
 
 export const AccountBalanceIcon = AccountBalanceOutlined;
 export const AddIcon = Add;
@@ -104,6 +110,7 @@ export const ChevronLeftIcon = ChevronLeft;
 export const ChevronRightIcon = ChevronRight;
 export const ContentCopyIcon = ContentCopy;
 export const DarkModeIcon = DarkModeOutlined;
+export const DeleteIcon = DeleteOutlined;
 export const FileDownloadIcon = FileDownloadOutlined;
 export const FilterListIcon = FilterListOutlined;
 export const LinkIcon = LinkOutlined;
@@ -130,6 +137,11 @@ export const VisibilityOffIcon = VisibilityOffOutlined;
 export const OpenInNewIcon = OpenInNewOutlined;
 export const LockOpenIcon = LockOpenOutlined;
 export const SyncIcon = SyncOutlined;
+export const PaymentIcon = PaymentOutlined;
+export const QueryStatsIcon = QueryStatsOutlined;
+export const FolderOpenIcon = FolderOpenOutlined;
+export const InfoIcon = InfoOutlined;
+export const WarningIcon = WarningOutlined;
 
 export const Icons = {
   AccountBalance: AccountBalanceIcon,
@@ -171,6 +183,7 @@ export const Icons = {
   ChevronRight: ChevronRightIcon,
   ContentCopy: ContentCopyIcon,
   DarkMode: DarkModeIcon,
+  Delete: DeleteIcon,
   FileDownload: FileDownloadIcon,
   FilterList: FilterListIcon,
   Link: LinkIcon,
@@ -196,7 +209,12 @@ export const Icons = {
   VisibilityOff: VisibilityOffIcon,
   OpenInNew: OpenInNewIcon,
   LockOpen: LockOpenIcon,
-  Sync: SyncIcon
+  Sync: SyncIcon,
+  Payment: PaymentIcon,
+  QueryStats: QueryStatsIcon,
+  FolderOpen: FolderOpenIcon,
+  Info: InfoIcon,
+  Warning: WarningIcon
 } as const;
 
 export type IconName = keyof typeof Icons;
@@ -210,6 +228,7 @@ export const navIcons: Record<NavItemId, (typeof Icons)[IconName]> = {
   risk_analysis: Icons.GppMaybe,
   investigation_reports: Icons.Assessment,
   audit_trail: Icons.History,
+  shared_properties: Icons.FolderOpen,
   users: Icons.ManageAccounts,
   settings: Icons.Settings
 } as const;

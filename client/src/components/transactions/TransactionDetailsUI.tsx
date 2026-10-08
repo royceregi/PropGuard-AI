@@ -36,7 +36,7 @@ export function TransactionDetailsUI({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-  const canVerify = Boolean(user);
+  const canVerify = Boolean(user && user.access_level !== "PUBLIC");
   const riskPanelRef = useRef<BlockchainRiskPanelHandle>(null);
 
   useEffect(() => {
@@ -194,6 +194,14 @@ export function TransactionDetailsUI({
                 Verify Blockchain
               </Link>
             ) : null}
+            <Link
+              href={`/ai-investigation?transaction_id=${encodeURIComponent(transaction.transaction_id)}`}
+              title="Open full 4-agent forensics pipeline console"
+              className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 font-medium text-text-primary transition-colors hover:bg-surface-subtle"
+            >
+              <Icons.SmartToy className="h-[18px] w-[18px] text-primary" />
+              AI Console
+            </Link>
             <button
               type="button"
               onClick={() => riskPanelRef.current?.run()}
@@ -201,7 +209,7 @@ export function TransactionDetailsUI({
               className="flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 font-medium text-white transition-colors hover:bg-primary-hover"
             >
               <Icons.AutoAwesome className="h-[18px] w-[18px]" />
-              Run AI Investigation
+              Run Quick Risk Check
             </button>
           </div>
         </div>
