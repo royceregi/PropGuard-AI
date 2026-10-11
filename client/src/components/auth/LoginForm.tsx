@@ -121,6 +121,8 @@ export function LoginForm() {
               setServerError(null);
             }}
             placeholder="maria.s@example.com"
+            // Email-autofill extensions inject attributes into this input before hydration.
+            suppressHydrationWarning
             className={`h-11 w-full rounded-lg border bg-surface py-2 pr-3 pl-10 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-primary ${
               showEmailError ? "border-danger" : "border-border"
             }`}

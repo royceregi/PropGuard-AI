@@ -15,6 +15,7 @@ import {
 } from "@/lib/property-search/types";
 import {
   apiErrorMessage,
+  isCompletedResult,
   SECTION_LABELS,
   VERIFICATION_SECTIONS,
   type PropertyAccessRow,
@@ -26,6 +27,7 @@ import { toast } from "@/lib/toast";
 import {
   downloadCertificate,
   HistoryTimeline,
+  IssuesFoundNotice,
   RequestStatusBadge,
   RiskLevelBadge,
   SignalList,
@@ -77,6 +79,21 @@ export function RequesterRiskView() {
     setHandledQuery(queryPropertyId);
     setPresetPropertyId(queryPropertyId);
     setStepperOpen(true);
+  }
+
+  const queryNew = searchParams.get("new");
+  const [handledNew, setHandledNew] = useState<string | null>(null);
+  if (overview && queryNew && handledNew !== queryNew && !queryPropertyId) {
+    setHandledNew(queryNew);
+    setPresetPropertyId(null);
+    setStepperOpen(true);
+  }
+
+  const queryRequestId = searchParams.get("request")?.trim() || null;
+  const [handledRequest, setHandledRequest] = useState<string | null>(null);
+  if (queryRequestId && handledRequest !== queryRequestId) {
+    setHandledRequest(queryRequestId);
+    setResultRequestId(queryRequestId);
   }
 
   const allRows = useMemo(
@@ -284,7 +301,7 @@ function PropertyTable({
                         className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-text-primary hover:bg-surface-subtle"
                       >
                         <Icons.Visibility className="h-4 w-4" />
-                        {req.status === "VERIFIED"
+                        {isCompletedResult(req.status)
                           ? "View Result"
                           : "Track Status"}
                       </button>
@@ -686,7 +703,9 @@ function ResultDrawer({
       open={Boolean(requestId)}
       onClose={onClose}
       title={
-        current?.status === "VERIFIED" ? "Assessment Result" : "Request Status"
+        current && isCompletedResult(current.status)
+          ? "Assessment Result"
+          : "Request Status"
       }
       subtitle={
         requestId ? (
@@ -731,8 +750,20 @@ function ResultDrawer({
             </div>
           </div>
 
-          {current.status === "VERIFIED" ? (
-            <div className="space-y-4 rounded-xl border border-success/30 bg-success/5 p-4">
+          {isCompletedResult(current.status) ? (
+            <div
+              className={`space-y-4 rounded-xl border p-4 ${
+                current.status === "ISSUES_FOUND"
+                  ? "border-warning/40 bg-warning/5"
+                  : "border-success/30 bg-success/5"
+              }`}
+            >
+              {current.status === "ISSUES_FOUND" ? (
+                <IssuesFoundNotice
+                  checks={current.verification_checks}
+                  audience="requester"
+                />
+              ) : null}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-semibold tracking-wider text-text-muted uppercase">
@@ -747,7 +778,9 @@ function ResultDrawer({
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-semibold tracking-wider text-text-muted uppercase">
-                    Registry verified
+                    {current.status === "ISSUES_FOUND"
+                      ? "Registry reviewed"
+                      : "Registry verified"}
                   </p>
                   <p className="text-sm font-medium text-text-primary">
                     {formatDateTime(current.completed_at)}
@@ -761,7 +794,7 @@ function ResultDrawer({
               </div>
               <div>
                 <p className="mb-1 text-[10px] font-semibold tracking-wider text-text-muted uppercase">
-                  Verified notes
+                  Registry notes
                 </p>
                 <p className="text-sm whitespace-pre-line text-text-primary">
                   {current.registry_notes}

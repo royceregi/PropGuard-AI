@@ -19,11 +19,26 @@ from app.api.property_access import is_public_viewer
 from app.core.database import get_db
 from app.models.property import Property, PropertyShare
 from app.models.user import User as UserModel
+from app.repositories import property_repository
 from app.schemas.property_share import PropertyShareCreate
 
 router = APIRouter()
 
-ALL_ROLES = ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
+# Super Admin and Land Registry neither own nor receive properties, so sharing is not for them.
+SHARE_ROLES = ["COMPANY", "PUBLIC"]
+
+
+def _serialize_property(prop: Property | None) -> dict[str, Any] | None:
+    if prop is None or not getattr(prop, "property_id", None):
+        return None
+    return {
+        "property_id": getattr(prop, "property_id", None),
+        "property_name": getattr(prop, "property_name", None),
+        "address": getattr(prop, "address", None),
+        "city": getattr(prop, "city", None),
+        "district": getattr(prop, "district", None),
+        "title_deed_number": getattr(prop, "title_deed_number", None),
+    }
 
 
 def _serialize_share(db: Session, share: PropertyShare) -> dict[str, Any]:
@@ -34,16 +49,7 @@ def _serialize_share(db: Session, share: PropertyShare) -> dict[str, Any]:
     owner = db.query(UserModel).filter(UserModel.user_id == share.owner_user_id).first()
     buyer = db.query(UserModel).filter(UserModel.user_id == share.buyer_user_id).first()
 
-    prop_data = None
-    if prop and getattr(prop, "property_id", None):
-        prop_data = {
-            "property_id": getattr(prop, "property_id", None),
-            "property_name": getattr(prop, "property_name", None),
-            "address": getattr(prop, "address", None),
-            "city": getattr(prop, "city", None),
-            "district": getattr(prop, "district", None),
-            "title_deed_number": getattr(prop, "title_deed_number", None),
-        }
+    prop_data = _serialize_property(prop)
 
     owner_data = None
     if owner and getattr(owner, "user_id", None):
@@ -88,14 +94,14 @@ def share_property_with_buyer(
     property_id: str,
     payload: PropertyShareCreate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_roles(ALL_ROLES)),
+    current_user: UserModel = Depends(require_roles(SHARE_ROLES)),
 ):
     """Current property owner (seller) shares property details read-only with a buyer."""
     prop = db.query(Property).filter(Property.property_id == property_id.strip()).first()
     if prop is None or not getattr(prop, "property_id", None):
         raise HTTPException(status_code=404, detail="Property not found")
 
-    # Access check: user must be current owner or authority role
+    # Access check: public users must be the current owner
     if (
         is_public_viewer(current_user)
         and getattr(prop, "current_owner_id", None) != current_user.user_id
@@ -161,9 +167,9 @@ def revoke_property_share(
     property_id: str,
     share_id: str,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_roles(ALL_ROLES)),
+    current_user: UserModel = Depends(require_roles(SHARE_ROLES)),
 ):
-    """Revoke an active property share (owner or authority only)."""
+    """Revoke an active property share (its owner, or a company user)."""
     share = (
         db.query(PropertyShare)
         .filter(
@@ -204,7 +210,7 @@ def revoke_property_share(
 def received_shares_inbox(
     active_only: bool = Query(True),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_roles(ALL_ROLES)),
+    current_user: UserModel = Depends(require_roles(SHARE_ROLES)),
 ):
     """Buyer's inbox: properties shared with current user."""
     query = db.query(PropertyShare).filter(PropertyShare.buyer_user_id == current_user.user_id)
@@ -218,10 +224,46 @@ def received_shares_inbox(
     return [_serialize_share(db, s) for s in shares]
 
 
+@router.get("/shares/linked", response_model=list[dict[str, Any]])
+def linked_properties(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(require_roles(SHARE_ROLES)),
+):
+    """Properties the user can see without owning or an explicit share.
+
+    Mirrors the SHARED access used by risk analysis: previous ownership or being a
+    transaction party. Properties already explicitly shared are left to /shares/received.
+    """
+    user_id = current_user.user_id
+    owned, history, party = property_repository.property_access_sets(db, user_id)
+    explicit = property_repository.active_shared_property_ids_for_user(db, user_id)
+    linked_ids = (history | party) - owned - explicit
+    if not linked_ids:
+        return []
+
+    props = db.query(Property).filter(Property.property_id.in_(linked_ids)).all()
+    rows = []
+    for prop in props:
+        reasons = []
+        if prop.property_id in history:
+            reasons.append("PREVIOUS_OWNER")
+        if prop.property_id in party:
+            reasons.append("TRANSACTION_PARTY")
+        rows.append(
+            {
+                "property_id": prop.property_id,
+                "property": _serialize_property(prop),
+                "reasons": reasons,
+            }
+        )
+    rows.sort(key=lambda row: row["property_id"])
+    return rows
+
+
 @router.get("/shares/sent", response_model=list[dict[str, Any]])
 def sent_shares_outbox(
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_roles(ALL_ROLES)),
+    current_user: UserModel = Depends(require_roles(SHARE_ROLES)),
 ):
     """Seller's outbox: property shares created by current user."""
     shares = (

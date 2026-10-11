@@ -8,7 +8,7 @@ single ranked evidence list:
 2. Investigation intents — the example queries in 07 (high-value transactions, previous owners,
    document hash mismatches, rapid ownership changes, high-risk assessments) as structured SQL.
    Relevance 0.90 when the record passes the intent threshold, otherwise 0.70.
-3. PostgreSQL full-text search over the sql/013 GIN indexes. Relevance = share of query terms the
+3. PostgreSQL full-text search over the database's GIN indexes. Relevance = share of query terms the
    record contains × (0.7 + 0.3 × ts_rank_cd relative to the best match), so a record containing
    every term scores at least 0.70.
 
@@ -34,7 +34,7 @@ EVIDENCE_TABLES = {
     "assessment": "risk_assessments",
 }
 
-# Must match the index expressions in sql/013_full_text_search.sql.
+# Must match the full-text GIN index expressions in the database, or the indexes go unused.
 DOCUMENT_TSV = "to_tsvector('english'::regconfig, coalesce(d.document_text, ''))"
 PROPERTY_TSV = (
     "to_tsvector('english'::regconfig, "

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { PropertySearchUI } from "@/components/property-search/PropertySearchUI";
 
 export const metadata: Metadata = {
@@ -6,5 +7,13 @@ export const metadata: Metadata = {
 };
 
 export default function PropertySearchPage() {
-  return <PropertySearchUI />;
+  return (
+    <Suspense
+      fallback={
+        <p className="p-6 text-sm text-text-muted">Loading property search…</p>
+      }
+    >
+      <PropertySearchUI />
+    </Suspense>
+  );
 }

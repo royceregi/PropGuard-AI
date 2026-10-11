@@ -45,7 +45,33 @@ export type RetrievalResponse = {
   warnings: string[];
   response_time_ms: number;
   ai_answer?: string | null;
+  question?: string | null;
+  /** "retrieval" when typed on the Evidence Retrieval page, "assistant" when asked in the chat. */
+  origin?: "retrieval" | "assistant" | string | null;
 };
+
+/** Page that shows one evidence record, or null when there is no detail page for it. */
+export function evidenceHref(
+  source: string,
+  ids: {
+    record_id?: string | null;
+    property_id?: string | null;
+    transaction_id?: string | null;
+  }
+): string | null {
+  if (source === "transaction") {
+    const tid = ids.transaction_id ?? ids.record_id;
+    return tid ? `/transactions/${encodeURIComponent(tid)}` : null;
+  }
+  if (source === "property") {
+    const pid = ids.property_id ?? ids.record_id;
+    return pid ? `/property-search/${encodeURIComponent(pid)}` : null;
+  }
+  if (source === "document" && ids.property_id) {
+    return `/property-search/${encodeURIComponent(ids.property_id)}`;
+  }
+  return null;
+}
 
 export type RetrievalHistoryRow = {
   query_id: string;

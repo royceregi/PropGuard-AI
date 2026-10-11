@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     AI_MAX_TOKENS: int = 2048
     AI_TIMEOUT_SECONDS: int = 60
 
+    # Anomaly model
+    ANOMALY_MODEL_ENABLED: bool = True
+    ANOMALY_MODEL_PATH: str = "models/anomaly_isolation_forest.joblib"
+    ANOMALY_CONTAMINATION: float = 0.01
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

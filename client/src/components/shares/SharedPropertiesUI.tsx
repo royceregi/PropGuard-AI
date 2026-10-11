@@ -5,15 +5,71 @@ import Link from "next/link";
 import { isAxiosError } from "axios";
 import { Icons } from "@/components/icons";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
+import { useAuth } from "@/hooks/useAuth";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { api } from "@/lib/api/client";
-import type { PropertyShareItem } from "@/lib/shares/types";
+import {
+  LINK_REASON_LABELS,
+  type LinkedPropertyItem,
+  type PropertyShareItem
+} from "@/lib/shares/types";
 import { formatDateTime, shortenId } from "@/lib/property-search/types";
+
+async function fetchShares() {
+  const [receivedRes, sentRes, linkedRes] = await Promise.all([
+    api.get<PropertyShareItem[]>("/api/v1/shares/received", {
+      params: { active_only: false }
+    }),
+    api.get<PropertyShareItem[]>("/api/v1/shares/sent"),
+    api.get<LinkedPropertyItem[]>("/api/v1/shares/linked")
+  ]);
+  return {
+    received: receivedRes.data,
+    sent: sentRes.data,
+    linked: linkedRes.data
+  };
+}
+
+function PropertyActions({ propertyId }: { propertyId: string }) {
+  const { user } = useAuth();
+  const canVerify = Boolean(user && user.access_level !== "PUBLIC");
+  const id = encodeURIComponent(propertyId);
+  return (
+    <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+      <Link
+        href={`/property-search/${id}`}
+        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover transition-colors"
+      >
+        <Icons.Search className="h-3.5 w-3.5" />
+        Inspect Details
+      </Link>
+      {canVerify ? (
+        <Link
+          href={`/blockchain-verification?property_id=${id}`}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-text-primary hover:bg-surface-subtle transition-colors"
+        >
+          <Icons.ViewInAr className="h-3.5 w-3.5 text-text-muted" />
+          Verify Ledger
+        </Link>
+      ) : null}
+      <Link
+        href={`/risk-analysis?property_id=${id}`}
+        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-text-primary hover:bg-surface-subtle transition-colors"
+      >
+        <Icons.GppMaybe className="h-3.5 w-3.5 text-text-muted" />
+        Risk Assessment
+      </Link>
+    </div>
+  );
+}
 
 export function SharedPropertiesUI() {
   const [activeTab, setActiveTab] = useState<"received" | "sent">("received");
   const [receivedShares, setReceivedShares] = useState<PropertyShareItem[]>([]);
   const [sentShares, setSentShares] = useState<PropertyShareItem[]>([]);
+  const [linkedProperties, setLinkedProperties] = useState<
+    LinkedPropertyItem[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -26,15 +82,11 @@ export function SharedPropertiesUI() {
 
     async function loadData() {
       try {
-        const [receivedRes, sentRes] = await Promise.all([
-          api.get<PropertyShareItem[]>("/api/v1/shares/received", {
-            params: { active_only: false }
-          }),
-          api.get<PropertyShareItem[]>("/api/v1/shares/sent")
-        ]);
+        const data = await fetchShares();
         if (!cancelled) {
-          setReceivedShares(receivedRes.data);
-          setSentShares(sentRes.data);
+          setReceivedShares(data.received);
+          setSentShares(data.sent);
+          setLinkedProperties(data.linked);
           setError(null);
         }
       } catch (err) {
@@ -62,14 +114,10 @@ export function SharedPropertiesUI() {
     setLoading(true);
     setError(null);
     try {
-      const [receivedRes, sentRes] = await Promise.all([
-        api.get<PropertyShareItem[]>("/api/v1/shares/received", {
-          params: { active_only: false }
-        }),
-        api.get<PropertyShareItem[]>("/api/v1/shares/sent")
-      ]);
-      setReceivedShares(receivedRes.data);
-      setSentShares(sentRes.data);
+      const data = await fetchShares();
+      setReceivedShares(data.received);
+      setSentShares(data.sent);
+      setLinkedProperties(data.linked);
     } catch (err) {
       setError(
         isAxiosError(err) && typeof err.response?.data?.detail === "string"
@@ -110,6 +158,13 @@ export function SharedPropertiesUI() {
       setRevokingShareId(null);
     }
   }
+
+  const sharedWithMeCount =
+    new Set(
+      receivedShares
+        .filter((share) => share.is_active)
+        .map((share) => share.property_id)
+    ).size + linkedProperties.length;
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-3 sm:p-4 lg:p-6 xl:p-8">
@@ -173,7 +228,7 @@ export function SharedPropertiesUI() {
           }`}
         >
           <Icons.Mail className="h-4 w-4" />
-          Shared With Me ({receivedShares.length})
+          Shared With Me ({sharedWithMeCount})
         </button>
         <button
           type="button"
@@ -199,7 +254,7 @@ export function SharedPropertiesUI() {
       ) : activeTab === "received" ? (
         /* Tab 1: Received Shares (Buyer Inbox) */
         <section className="flex flex-col gap-4">
-          {receivedShares.length === 0 ? (
+          {receivedShares.length === 0 && linkedProperties.length === 0 && (
             <div className="rounded-xl border border-border bg-surface p-12 text-center">
               <Icons.FolderOpen className="mx-auto h-8 w-8 text-text-muted" />
               <h3 className="mt-2 text-sm font-semibold text-text-primary">
@@ -210,7 +265,9 @@ export function SharedPropertiesUI() {
                 verification access with your User ID, it will appear here.
               </p>
             </div>
-          ) : (
+          )}
+
+          {receivedShares.length > 0 && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {receivedShares.map((share) => {
                 const prop = share.property;
@@ -297,33 +354,63 @@ export function SharedPropertiesUI() {
                       </div>
                     </div>
 
-                    {/* Action Bar */}
-                    <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                      <Link
-                        href={`/property-search/${encodeURIComponent(share.property_id)}`}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-hover transition-colors"
-                      >
-                        <Icons.Search className="h-3.5 w-3.5" />
-                        Inspect Details
-                      </Link>
-                      <Link
-                        href={`/blockchain-verification?property_id=${encodeURIComponent(share.property_id)}`}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-text-primary hover:bg-surface-subtle transition-colors"
-                      >
-                        <Icons.ViewInAr className="h-3.5 w-3.5 text-text-muted" />
-                        Verify Ledger
-                      </Link>
-                      <Link
-                        href={`/risk-analysis?property_id=${encodeURIComponent(share.property_id)}`}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-text-primary hover:bg-surface-subtle transition-colors"
-                      >
-                        <Icons.GppMaybe className="h-3.5 w-3.5 text-text-muted" />
-                        Risk Assessment
-                      </Link>
-                    </div>
+                    <PropertyActions propertyId={share.property_id} />
                   </article>
                 );
               })}
+            </div>
+          )}
+
+          {linkedProperties.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-text-primary">
+                  Linked Through Your Records ({linkedProperties.length})
+                </h2>
+                <p className="text-xs text-text-secondary">
+                  Properties you previously owned or took part in a transaction
+                  for. You can view them read-only.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {linkedProperties.map((item) => {
+                  const prop = item.property;
+                  return (
+                    <article
+                      key={item.property_id}
+                      className="flex flex-col justify-between rounded-xl border border-border bg-surface p-5 transition-shadow hover:shadow-xs"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="font-mono text-[11px] text-text-muted">
+                            Deed #{prop?.title_deed_number || item.property_id}
+                          </span>
+                          <h3 className="text-base font-bold text-text-primary mt-0.5">
+                            {prop?.property_name ||
+                              `Property ${shortenId(item.property_id, 10, 6)}`}
+                          </h3>
+                          <p className="text-xs text-text-secondary">
+                            {[prop?.address, prop?.city, prop?.district]
+                              .filter(Boolean)
+                              .join(", ") || "—"}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {item.reasons.map((reason) => (
+                            <StatusBadge
+                              key={reason}
+                              label={LINK_REASON_LABELS[reason]}
+                              variant="neutral"
+                              size="sm"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <PropertyActions propertyId={item.property_id} />
+                    </article>
+                  );
+                })}
+              </div>
             </div>
           )}
         </section>

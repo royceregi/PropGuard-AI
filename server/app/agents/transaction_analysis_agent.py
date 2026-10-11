@@ -34,19 +34,33 @@ def run(
     transaction_id: str,
     retrieval_output: dict[str, Any] | None = None,
     evaluation: dict[str, Any] | None = None,
+    query_id: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Execute Transaction Analysis Agent.
+
+    Reuses the registry checks already computed by the Retrieval Agent when ``evaluation``
+    is supplied; runs them itself only when used standalone.
 
     Returns (agent_output_dict, findings_dict).
     """
     started = datetime.now()
-    input_data = {"transaction_id": transaction_id}
+    input_data: dict[str, Any] = {"transaction_id": transaction_id}
+    if retrieval_output:
+        input_data["from_agent"] = retrieval_output.get("agent_name")
 
     try:
-        checks_result = registry_checks_service.run_checks(db, transaction_id)
+        checks_result = (evaluation or {}).get("registry_checks")
+        if checks_result is None:
+            checks_result = registry_checks_service.run_checks(db, transaction_id)
     except Exception as exc:
         log_run(
-            db, AGENT_NAME, input_data=input_data, output=None, started_at=started, error=str(exc)
+            db,
+            AGENT_NAME,
+            input_data=input_data,
+            output=None,
+            started_at=started,
+            error=str(exc),
+            query_id=query_id,
         )
         raise
 
@@ -59,7 +73,14 @@ def run(
             evidence_ids=[],
             warnings=["No registry or ledger transaction found to analyze."],
         )
-        log_run(db, AGENT_NAME, input_data=input_data, output=output, started_at=started)
+        log_run(
+            db,
+            AGENT_NAME,
+            input_data=input_data,
+            output=output,
+            started_at=started,
+            query_id=query_id,
+        )
         return output, {"transaction_id": transaction_id}
 
     checks = checks_result.get("checks", [])
@@ -130,5 +151,7 @@ def run(
         evidence_ids=evidence_ids,
         warnings=warnings,
     )
-    log_run(db, AGENT_NAME, input_data=input_data, output=output, started_at=started)
+    log_run(
+        db, AGENT_NAME, input_data=input_data, output=output, started_at=started, query_id=query_id
+    )
     return output, findings

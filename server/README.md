@@ -1,164 +1,91 @@
-# FastAPI Server
+# PropGuard AI — Backend (FastAPI)
 
-PropGuard AI backend (FastAPI + PostgreSQL `property_db`).
+REST API for PropGuard AI: authentication, property and ledger data, blockchain verification, evidence retrieval, the four-agent investigation pipeline, risk assessments, sharing, and notifications. It uses PostgreSQL (schema `core`) through SQLAlchemy.
+
+For the full project overview, architecture, API table, and usage guide, see the [root README](../README.md).
 
 ## Setup
 
 ```bash
 cd server
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # set DATABASE_URL, SECRET_KEY, and optional AI_* fields
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt  # runtime deps + httpx, pytest, ruff, pyright
+pip install numpy scikit-learn joblib  # anomaly model (not yet in requirements.txt)
+make env                             # .env with a random SECRET_KEY; then set DATABASE_URL
 ```
 
-## Auth (`core.users`)
-
-Email + password login. Authorization uses **`access_level`** (the `role` column is removed).
-
-| Access level | Meaning |
-| --- | --- |
-| `SYSTEM` | Super Admin |
-| `REGISTRY` | Land Registry |
-| `COMPANY` | Real Estate Company |
-| `PUBLIC` | Public user |
-| `STANDARD` | Approved / normal access |
-| `ELEVATED` | Pending admission (cannot sign in) |
-
-Admitting users: Registry/Company/System toggle `is_active` (no create-user form). Super Admin assigns `access_level`.
-
-| Endpoint | Purpose |
-| --- | --- |
-| `POST /api/auth/login` | `{ "email", "password" }` → JWT (`access_level` claim) + user |
-| `GET /api/auth/me` | Current user (Bearer or cookie) |
-
-Apply / refresh schema and demo accounts:
+The API expects an existing, fully migrated PostgreSQL database with the PropGuard `core` schema and data (not included in this repository; get a dump from the project team).
 
 ```bash
-psql "$DATABASE_URL" -f sql/001_alter_users_auth.sql
-psql "$DATABASE_URL" -f sql/004_access_level_auth.sql
-psql "$DATABASE_URL" -f sql/002_seed_demo_users.sql
-python scripts/seed_demo_users.py
+PYTHONPATH=. .venv/bin/python scripts/seed_demo_users.py   # four demo accounts
 ```
 
-Demo logins (local only):
-
-| Access level | Email | Password |
-| --- | --- | --- |
-| SYSTEM | `admin@prop.ai` | `pass!123` |
-| REGISTRY | `registry@prop.ai` | `pass!123` |
-| COMPANY | `estate@prop.ai` | `pass!123` |
-| PUBLIC | `user@prop.ai` | `pass!123` |
-
-## Property view APIs (read-only)
-
-Auth required. Access levels: `SYSTEM`, `REGISTRY`, `COMPANY`.
-
-Mapped to `core.properties`, `core.property_documents`, `core.property_transactions`, `core.property_ownership_history`.
-
-### Properties
-
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/v1/properties/` | Paginated list (`q`, `district`, `city`, `land_type`, `usage_type`, `verification_status`, `legal_status`, `skip`, `limit`) |
-| `GET /api/v1/properties/{property_id}` | Single property |
-| `GET /api/v1/properties/{property_id}/full` | Property + documents + transactions + ownership history |
-| `GET /api/v1/properties/{property_id}/documents` | Documents for one property |
-| `GET /api/v1/properties/{property_id}/transactions` | Transactions for one property |
-| `GET /api/v1/properties/{property_id}/ownership-history` | Ownership history (`active_only` optional) |
-
-### Property transactions (forensic / search)
-
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/v1/property-transactions/` | Paginated list (`q`, `property_id`, `transaction_id`, `status`, `registration_type`, `transaction_group`, `area_name`, `project_name`, `date_from`, `date_to`, `min_value`, `max_value`) |
-| `GET /api/v1/property-transactions/{transaction_id}` | Single transaction |
-
-### Property documents
-
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/v1/property-documents/` | Paginated list (`property_id`, `transaction_id`, `document_type`, `verification_status`) |
-| `GET /api/v1/property-documents/{document_id}` | Single document |
-
-### Ownership history
-
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/v1/property-ownership-history/` | Paginated list (`property_id`, `owner_id`, `ownership_status`, `active_only`) |
-| `GET /api/v1/property-ownership-history/{ownership_id}` | Single ownership row |
-
-All list endpoints return `{ items, total, skip, limit }`.
-
-## Blockchain ledger APIs
-
-Auth required. Access levels: `SYSTEM`, `REGISTRY`, `COMPANY`, `PUBLIC`, `STANDARD`.
-
-Mapped to `core.blockchain_transactions` (joined with `core.property_transactions` for `property_id` / currency when the ledger row has a null property id).
-
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/v1/blockchain-transactions/` | Paginated ledger list (`property_id`, `transaction_id`, `q`) |
-| `GET /api/v1/blockchain-transactions/by-property/{property_id}` | Latest ledger row for a property |
-| `GET /api/v1/blockchain-transactions/{transaction_id}` | Single ledger row |
-| `POST /api/v1/blockchain-transactions/verify` | Compare client `local_hash` to ledger payload commitment |
-| `GET /api/v1/blockchain/hash-details` | Paginated `v_blockchain_hash_details` + integrity flags |
-| `GET /api/v1/blockchain/verify/{transaction_id}` | Recalculate tx / previous / property / document hashes |
-
-### Admin hash rebuild (SYSTEM only)
-
-Canonical formulas (UTF-8 SHA-256, NULL → `""`, no separators):
-
-```text
-tx_hash = SHA256(transaction_id + property_id + previous_hash + block_timestamp + transaction_value)
-property_hash = SHA256(property_id + title_deed_number + survey_plan_number + land_area + current_owner_id)
-document_hash = SHA256(document_text)   # never overwritten by rebuild
-```
-
-| Endpoint | Purpose |
-| --- | --- |
-| `POST /api/v1/admin/blockchain/rebuild-hashes` | Clear then regenerate in one transaction (preferred) |
-| `POST /api/v1/admin/blockchain/clear-hashes` | Clear `tx_hash`, `previous_hash`, `property_hash` only |
-| `POST /api/v1/admin/blockchain/regenerate-hashes` | Ordered chain rebuild only (`previous_hash='0'` for genesis) |
-
-Apply the view / nullable `tx_hash` migration:
-
-```bash
-psql "$DATABASE_URL" -f sql/003_blockchain_hash_details_view.sql
-```
-
-Verify body (legacy payload commitment): `{ property_id?, transaction_id?, seller_address?, buyer_address?, value_usd?, currency?, local_hash? }`.
-
-Payload commitment = SHA-256 of sorted-key JSON:
-`buyerAddress`, `currency`, `propertyId`, `sellerAddress`, `valueUsd`.
-
-## AI / LLM env (optional)
-
-The LLM client supports OpenAI-compatible providers and independent model selection per
-agent. `AI_MODEL` is retained as the fallback for any agent-specific setting that is
-empty. Retrieval and Transaction Analysis are deterministic today; their model settings
-reserve the configuration needed for future LLM-assisted capabilities without allowing
-models to alter evidence or the authoritative risk score. Edit `server/.env`:
-
-| Variable | Purpose |
-| --- | --- |
-| `AI_ENABLED` | `true` when ready to call the model |
-| `AI_PROVIDER` | `gemini` \| `openai` \| `ollama` |
-| `AI_API_KEY` | Provider API key (leave empty for local Ollama if unused) |
-| `AI_MODEL` | Shared fallback model id |
-| `AI_RETRIEVAL_MODEL` | Retrieval Agent model override |
-| `AI_TRANSACTION_ANALYSIS_MODEL` | Transaction Analysis Agent model override |
-| `AI_RISK_MODEL` | Risk Agent model override |
-| `AI_REPORT_MODEL` | Report Agent model override |
-| `AI_BASE_URL` | Optional custom/base URL |
-| `AI_TEMPERATURE` | Sampling temperature |
-| `AI_MAX_TOKENS` | Max output tokens |
-| `AI_TIMEOUT_SECONDS` | Request timeout |
+On startup the API also creates any missing ORM-managed tables.
 
 ## Run
 
 ```bash
-uvicorn app.main:app --reload
+make dev    # uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-API: `http://127.0.0.1:8000` · Docs: `http://127.0.0.1:8000/docs`
+- API: http://localhost:8000
+- Interactive API docs (Swagger UI): http://localhost:8000/docs
+
+## Quality checks
+
+| Command | What it does |
+| --- | --- |
+| `make test` | pytest on `tests/` (`tests/core` unit tests, `tests/api` endpoint tests) |
+| `make lint` | Ruff linter |
+| `make format` / `make format-check` | Ruff formatter |
+| `make typecheck` | Pyright on `app/` |
+| `make check` | lint, format check, type check, and tests |
+
+## Code layout
+
+| Path | Contents |
+| --- | --- |
+| `app/main.py` | App entry point, CORS, router registration |
+| `app/api/deps.py` | `get_current_user`, `require_roles` |
+| `app/api/property_access.py` | Record scoping for `PUBLIC` users (own, previous, transaction-party, shared) |
+| `app/api/v1/endpoints/` | One module per API area; mounted under `/api/v1` (auth under `/api/auth`) |
+| `app/agents/` | Retrieval, Transaction Analysis, Risk, and Report agents, plus `orchestrator.py` |
+| `app/core/` | Settings, database, security, `hashing.py`, `signing.py`, `llm.py` |
+| `app/services/` | Business logic: retrieval, verification, risk, query guard, assistant, sharing, notifications |
+| `app/repositories/`, `app/models/`, `app/schemas/` | DB access, ORM models, Pydantic schemas |
+| `scripts/` | Demo seeding, registry key generation, anomaly model training, feature refresh, tamper demo, smoke test |
+## Authentication and access levels
+
+Login is email + password (`POST /api/auth/login`), returning a JWT with an `access_level` claim. Send it as `Authorization: Bearer <token>` or the `propguard_access_token` cookie.
+
+| `access_level` | Can sign in | Scope |
+| --- | --- | --- |
+| `SYSTEM` | Yes | Super Admin: everything, including user access and hash rebuild |
+| `REGISTRY` | Yes | Land Registry: all records, risk-request review |
+| `COMPANY` | Yes | Real Estate Company: all records, investigations, risk requests |
+| `PUBLIC` | Yes | Read-only; own, previously owned, transaction-party, and shared properties |
+| `STANDARD`, `ELEVATED` | No | Waiting for access / approval |
+
+Demo accounts (local only) are defined in [`scripts/seed_demo_users.py`](scripts/seed_demo_users.py), one per operational access level. Security details are in [security.md](../security.md).
+
+## Ledger hash formulas
+
+Defined in [`app/core/hashing.py`](app/core/hashing.py) (UTF-8 SHA-256 over canonical, sorted-key JSON):
+
+```text
+property_hash          = SHA256(canonical property payload)
+transaction_data_hash  = SHA256(canonical transaction payload + property_hash)
+tx_hash                = SHA256(previous_hash + transaction_data_hash + block_timestamp)
+previous_hash          = "0" for a property's first block, else the previous tx_hash
+document_hash          = SHA256(document_text)
+digital_signature      = Ed25519(tx_hash) with REGISTRY_SIGNING_KEY  (app/core/signing.py)
+```
+
+Generate a registry key pair with `PYTHONPATH=. .venv/bin/python scripts/generate_registry_key.py >> .env`, then rebuild hashes as Super Admin (`POST /api/v1/admin/blockchain/rebuild-hashes`) so every block is re-signed.
+
+## AI / LLM settings (optional)
+
+LLM calls are off by default (`AI_ENABLED=false`); the pipeline then uses its rule and template output. When enabled, the client in `app/core/llm.py` calls an OpenAI-compatible API (`AI_PROVIDER`: `gemini`, `openai`, `ollama`, or `openrouter`). `AI_MODEL` is the fallback, and each agent can use its own model through `AI_RETRIEVAL_MODEL`, `AI_TRANSACTION_ANALYSIS_MODEL`, `AI_RISK_MODEL`, and `AI_REPORT_MODEL`. Retrieval and Transaction Analysis stay rule-based, and an LLM never changes the evidence or the rule-based risk score.
+
+The full list of environment variables is in [`.env.example`](.env.example) and the [root README](../README.md#configuration-and-environment-variables).

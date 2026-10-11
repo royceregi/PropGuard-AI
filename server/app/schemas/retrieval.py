@@ -32,3 +32,5 @@ class RetrievalResponse(BaseModel):
     warnings: list[str]
     response_time_ms: int
     ai_answer: str | None = None
+    question: str | None = None
+    origin: str | None = None

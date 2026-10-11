@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.agents import orchestrator
 from app.api.deps import require_roles
-from app.api.property_access import ensure_transaction_access
+from app.api.property_access import ensure_transaction_access, is_public_viewer
 from app.core.database import get_db
 from app.models.retrieval import QueryLog, QueryRetrieval
 from app.models.risk_assessment import AgentRun
@@ -35,9 +35,10 @@ def list_investigations(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(require_roles(INVESTIGATION_ROLES)),
 ) -> dict[str, Any]:
-    """List all investigation reports with pagination."""
-    # Filter investigations (query logs with agent_used indicating investigation)
-    query = db.query(QueryLog).filter(QueryLog.query_text.like("investigate:%"))
+    """List investigation reports with pagination. PUBLIC users only see their own."""
+    query = db.query(QueryLog).filter(QueryLog.query_text.like(f"{orchestrator.QUERY_PREFIX}%"))
+    if is_public_viewer(current_user):
+        query = query.filter(QueryLog.user_id == current_user.user_id)
 
     total = query.count()
     logs = query.order_by(QueryLog.log_timestamp.desc()).offset(offset).limit(limit).all()
@@ -105,7 +106,7 @@ def get_investigation_by_query_id(
         )
         .first()
     )
-    if log is None:
+    if log is None or (is_public_viewer(current_user) and log.user_id != current_user.user_id):
         raise HTTPException(status_code=404, detail="Investigation record not found")
 
     runs = (
@@ -145,6 +146,7 @@ def get_investigation_by_query_id(
         "response_time_ms": log.response_time_ms,
         "agent_response": log.agent_response,
         "log_timestamp": log.log_timestamp.isoformat() if log.log_timestamp else None,
+        "report": orchestrator.stored_report(db, log.query_id),
         "agent_runs": [
             {
                 "agent_run_id": r.agent_run_id,

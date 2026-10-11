@@ -73,16 +73,14 @@ def notify_risk_request_created(
             type="RISK_REQUEST_CREATED",
             title="Risk Assessment Request Submitted",
             message=f"Your risk analysis request {request_id} for property {property_id} has been queued for verification.",
-            link=f"/risk-analysis/{request_id}",
+            link=f"/risk-analysis?request={request_id}",
         )
     except Exception as exc:
         logger.error("Failed to send buyer RISK_REQUEST_CREATED notification: %s", exc)
 
-    # 2. Notify Land Registry / System Officers
+    # 2. Notify Land Registry officers (the only role that reviews requests)
     try:
-        officers = (
-            db.query(User.user_id).filter(User.access_level.in_(["SYSTEM", "REGISTRY"])).all()
-        )
+        officers = db.query(User.user_id).filter(User.access_level == "REGISTRY").all()
         for (off_id,) in officers:
             notification_repository.create_notification(
                 db,
@@ -90,7 +88,7 @@ def notify_risk_request_created(
                 type="RISK_REQUEST_CREATED",
                 title="New Pending Risk Request",
                 message=f"Risk assessment request {request_id} for property {property_id} requires review.",
-                link=f"/risk-analysis/{request_id}",
+                link=f"/risk-analysis/review/{request_id}",
             )
     except Exception as exc:
         logger.error("Failed to send registry RISK_REQUEST_CREATED notification: %s", exc)
@@ -105,9 +103,16 @@ def notify_risk_request_completed(
     risk_level: str | None = None,
 ) -> None:
     risk_info = f" ({risk_level} Risk Level)" if risk_level else ""
-    title = f"Risk Assessment {status.capitalize()}"
-    message = f"Risk assessment request {request_id} for property {property_id} has been {status.lower()}{risk_info}."
-    link = f"/risk-analysis/{request_id}"
+    if status == "ISSUES_FOUND":
+        title = "Risk Assessment: Issues Found"
+        message = (
+            f"The Land Registry reviewed request {request_id} for property {property_id} and "
+            f"found issues{risk_info}. Please visit the Land Registry office to resolve them."
+        )
+    else:
+        title = f"Risk Assessment {status.capitalize()}"
+        message = f"Risk assessment request {request_id} for property {property_id} has been {status.lower()}{risk_info}."
+    link = f"/risk-analysis?request={request_id}"
     try:
         notification_repository.create_notification(
             db,

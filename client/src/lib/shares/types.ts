@@ -35,3 +35,16 @@ export interface CreateSharePayload {
 }
 
 export type PropertyShareItem = PropertyShareData;
+
+export type LinkReason = "PREVIOUS_OWNER" | "TRANSACTION_PARTY";
+
+export interface LinkedPropertyItem {
+  property_id: string;
+  property: PropertyShareData["property"];
+  reasons: LinkReason[];
+}
+
+export const LINK_REASON_LABELS: Record<LinkReason, string> = {
+  PREVIOUS_OWNER: "Previous owner",
+  TRANSACTION_PARTY: "Transaction party"
+};

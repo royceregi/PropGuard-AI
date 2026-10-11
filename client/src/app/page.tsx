@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { HeroSection } from "@/components/landing/HeroSection";
+import { HeroSection, LandingFooter } from "@/components/landing/HeroSection";
+import { LandingSections } from "@/components/landing/LandingSections";
 
 export const metadata: Metadata = {
   title: "PropGuard AI · Property Transaction Verification",
   description:
-    "Enterprise-grade AI and blockchain verification for land transactions. Tamper-evident integrity checks and explainable fraud-risk decision support for registries, enterprises, and property owners."
+    "Know a property deal is genuine before you sign. PropGuard AI keeps tamper-proof land records on a blockchain and uses AI agents to check every sale for warning signs."
 };
 
 export default function LandingPage() {
@@ -12,7 +13,9 @@ export default function LandingPage() {
     <div className="min-h-full flex-1 overflow-y-auto bg-surface-canvas">
       <main>
         <HeroSection />
+        <LandingSections />
       </main>
+      <LandingFooter />
     </div>
   );
 }

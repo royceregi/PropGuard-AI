@@ -18,7 +18,7 @@ from app.core.database import Base
 
 
 class TransactionFeature(Base):
-    """Per-transaction features for risk scoring (imported table; blockchain columns from sql/012)."""
+    """Per-transaction features for risk scoring (imported table; blockchain columns added by ensure_feature_columns)."""
 
     __tablename__ = "transaction_features"
     __table_args__ = {"schema": "core"}

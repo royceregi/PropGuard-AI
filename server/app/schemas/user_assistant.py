@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
+
+AssistantMode = Literal["retrieval", "investigation", "restricted"]
 
 
 class UserAssistantQueryRequest(BaseModel):
@@ -30,6 +33,13 @@ class UserAssistantQueryResponse(BaseModel):
     sources: list[UserAssistantSource] = []
     scoped_properties_count: int = 0
     warnings: list[str] = []
+    mode: AssistantMode = "retrieval"
+    detail_url: str | None = Field(
+        None,
+        description="Detailed view of this same query: Evidence Retrieval page or investigation report",
+    )
+    investigation_id: str | None = None
+    risk_level: str | None = None
 
 
 class UserAssistantHistoryItem(BaseModel):
@@ -39,3 +49,6 @@ class UserAssistantHistoryItem(BaseModel):
     confidence_score: float | None = None
     timestamp: datetime
     sources: list[UserAssistantSource] = []
+    mode: AssistantMode = "retrieval"
+    detail_url: str | None = None
+    investigation_id: str | None = None

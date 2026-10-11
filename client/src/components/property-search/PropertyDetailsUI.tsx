@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { isAxiosError } from "axios";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Icons } from "@/components/icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CopyableHashBox } from "@/components/ui/CopyableHashBox";
+import { Modal } from "@/components/ui/Overlay";
 import { SharePropertyModal } from "@/components/property-search/SharePropertyModal";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api/client";
@@ -19,7 +20,11 @@ import {
   shortenId,
   statusVariant,
   userProfileHref,
-  type PropertyDetail
+  type PaginatedList,
+  type PropertyDetail,
+  type PropertyDocument,
+  type PropertyOwnershipHistory,
+  type PropertyTransactionSummary
 } from "@/lib/property-search/types";
 
 export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
@@ -27,6 +32,9 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
   const canRequestRisk =
     user?.access_level === "PUBLIC" || user?.access_level === "COMPANY";
   const canVerify = Boolean(user && user.access_level !== "PUBLIC");
+  const canViewFullHistory =
+    user?.access_level === "SYSTEM" || user?.access_level === "REGISTRY";
+  const [expanded, setExpanded] = useState<HistoryKind | null>(null);
   const [property, setProperty] = useState<PropertyDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,12 +132,9 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
       (property.current_owner &&
         user.user_id === property.current_owner.user_id))
   );
-  const isAuthority = Boolean(
-    user &&
-    (user.access_level === "SYSTEM" ||
-      user.access_level === "REGISTRY" ||
-      user.access_level === "COMPANY")
-  );
+  const canShare =
+    user?.access_level === "COMPANY" ||
+    (user?.access_level === "PUBLIC" && isOwner);
   const isSharedProperty = Boolean(
     user && user.access_level === "PUBLIC" && !isOwner
   );
@@ -213,7 +218,7 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
                 Verify Blockchain
               </Link>
             ) : null}
-            {isOwner || isAuthority ? (
+            {canShare ? (
               <button
                 type="button"
                 onClick={() => setShareModalOpen(true)}
@@ -319,148 +324,49 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
           </section>
 
           <section className="flex flex-col rounded-xl border border-border bg-surface p-5 md:p-6">
-            <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-text-primary">
-              <Icons.History className="h-[22px] w-[22px] text-text-muted" />
-              Ownership History
-            </h2>
+            <SectionHeader
+              icon={
+                <Icons.History className="h-[22px] w-[22px] text-text-muted" />
+              }
+              title="Ownership History"
+              shown={ownership.length}
+              total={property.ownership_history_total}
+              onShowMore={
+                canViewFullHistory ? () => setExpanded("ownership") : undefined
+              }
+            />
             {ownership.length === 0 ? (
               <p className="text-sm text-text-muted">
                 No ownership history recorded for this property.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse text-left text-sm">
-                  <thead className="text-[11px] font-semibold tracking-wider text-text-muted uppercase">
-                    <tr>
-                      <th className="pb-3 pr-4">Owner</th>
-                      <th className="pb-3 pr-4">Type</th>
-                      <th className="pb-3 pr-4">Start</th>
-                      <th className="pb-3 pr-4">End</th>
-                      <th className="pb-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ownership.map((row) => {
-                      const ownerHref = userProfileHref(
-                        row.owner,
-                        row.owner_id
-                      );
-                      return (
-                        <tr
-                          key={row.ownership_id}
-                          className="border-t border-border-subtle"
-                        >
-                          <td className="py-3 pr-4 text-text-primary">
-                            {ownerHref ? (
-                              <Link
-                                href={ownerHref}
-                                className="font-medium text-link hover:text-link-hover"
-                              >
-                                {row.owner?.full_name?.trim() ||
-                                  row.owner_id?.trim() ||
-                                  "—"}
-                              </Link>
-                            ) : (
-                              row.owner?.full_name?.trim() ||
-                              row.owner_id?.trim() ||
-                              "—"
-                            )}
-                            {row.owner_id ? (
-                              <div className="mt-0.5 font-mono text-xs text-text-muted">
-                                {row.owner_id}
-                              </div>
-                            ) : null}
-                          </td>
-                          <td className="py-3 pr-4 text-text-secondary">
-                            {row.ownership_type?.trim() || "—"}
-                          </td>
-                          <td className="py-3 pr-4 text-text-secondary">
-                            {formatDate(row.ownership_start_date)}
-                          </td>
-                          <td className="py-3 pr-4 text-text-secondary">
-                            {formatDate(row.ownership_end_date)}
-                          </td>
-                          <td className="py-3">
-                            <StatusBadge
-                              label={(
-                                row.ownership_status ?? "—"
-                              ).toUpperCase()}
-                              variant={statusVariant(row.ownership_status)}
-                              size="sm"
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <OwnershipTable rows={ownership} />
             )}
           </section>
 
           <section className="flex flex-col rounded-xl border border-border bg-surface p-5 md:p-6">
-            <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-text-primary">
-              <Icons.Receipt className="h-[22px] w-[22px] text-text-muted" />
-              Related Transactions
-            </h2>
+            <SectionHeader
+              icon={
+                <Icons.Receipt className="h-[22px] w-[22px] text-text-muted" />
+              }
+              title="Related Transactions"
+              shown={transactions.length}
+              total={property.transactions_total}
+              onShowMore={
+                canViewFullHistory
+                  ? () => setExpanded("transactions")
+                  : undefined
+              }
+            />
             {transactions.length === 0 ? (
               <p className="text-sm text-text-muted">
                 No transactions linked to this property.
               </p>
             ) : (
-              <ul className="divide-y divide-border-subtle">
-                {transactions.slice(0, 8).map((tx) => (
-                  <li
-                    key={tx.transaction_id}
-                    className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      {canViewTransactionsNav ? (
-                        <Link
-                          href={`/transactions/${encodeURIComponent(tx.transaction_id)}`}
-                          className="font-mono text-sm text-link hover:text-link-hover"
-                        >
-                          {shortenId(tx.transaction_id, 8, 6)}
-                        </Link>
-                      ) : (
-                        <span className="font-mono text-sm font-semibold text-text-primary">
-                          {shortenId(tx.transaction_id, 8, 6)}
-                        </span>
-                      )}
-                      <p className="text-xs text-text-muted">
-                        {tx.registration_type ||
-                          tx.transaction_group ||
-                          tx.procedure_name ||
-                          "Transaction"}{" "}
-                        · {formatDateTime(tx.transaction_datetime)}
-                      </p>
-                      <p className="mt-1 text-xs text-text-secondary">
-                        Seller:{" "}
-                        {tx.seller?.user?.full_name?.trim() ||
-                          tx.seller?.party_name?.trim() ||
-                          "—"}
-                        {" · "}
-                        Buyer:{" "}
-                        {tx.buyer?.user?.full_name?.trim() ||
-                          tx.buyer?.party_name?.trim() ||
-                          "—"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-text-primary tabular-nums">
-                        {formatMoney(tx.transaction_value) === "—"
-                          ? "—"
-                          : `${formatMoney(tx.transaction_value)} ${tx.currency?.trim() || "AED"}`}
-                      </span>
-                      <StatusBadge
-                        label={(tx.status ?? "—").toUpperCase()}
-                        variant={statusVariant(tx.status)}
-                        size="sm"
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <TransactionList
+                rows={transactions}
+                linkable={canViewTransactionsNav}
+              />
             )}
           </section>
         </div>
@@ -511,54 +417,57 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
           </section>
 
           <section className="flex flex-col rounded-xl border border-border bg-surface p-5 md:p-6">
-            <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-text-primary">
-              <Icons.Description className="h-[22px] w-[22px] text-text-muted" />
-              Documents
-            </h2>
+            <SectionHeader
+              icon={
+                <Icons.Description className="h-[22px] w-[22px] text-text-muted" />
+              }
+              title="Documents"
+              shown={documents.length}
+              total={property.documents_total}
+              onShowMore={
+                canViewFullHistory ? () => setExpanded("documents") : undefined
+              }
+            />
             {documents.length === 0 ? (
               <p className="text-sm text-text-muted">
                 No documents on file for this property.
               </p>
             ) : (
-              <ul className="flex flex-col gap-3">
-                {documents.map((doc) => (
-                  <li
-                    key={doc.document_id}
-                    className="rounded-lg border border-border-subtle bg-surface-subtle/40 p-3"
-                  >
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <span className="text-sm font-medium text-text-primary">
-                        {doc.document_type?.trim() ||
-                          doc.document_number?.trim() ||
-                          `Document #${doc.document_id}`}
-                      </span>
-                      <StatusBadge
-                        label={(doc.verification_status ?? "—").toUpperCase()}
-                        variant={statusVariant(doc.verification_status)}
-                        size="sm"
-                      />
-                    </div>
-                    {doc.document_hash ? (
-                      <CopyableHashBox
-                        label="Document hash"
-                        value={doc.document_hash}
-                        displayValue={shortenId(doc.document_hash, 8, 6)}
-                      />
-                    ) : (
-                      <p className="text-xs text-text-muted">
-                        No hash on record
-                      </p>
-                    )}
-                    <p className="mt-2 text-xs text-text-muted">
-                      Issued {formatDate(doc.issued_date)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
+              <DocumentList rows={documents} />
             )}
           </section>
         </div>
       </div>
+
+      {expanded === "ownership" ? (
+        <PaginatedHistoryModal<PropertyOwnershipHistory>
+          title="Ownership History"
+          propertyId={property.property_id}
+          endpoint="ownership-history"
+          onClose={() => setExpanded(null)}
+          renderItems={(rows) => <OwnershipTable rows={rows} />}
+        />
+      ) : null}
+      {expanded === "transactions" ? (
+        <PaginatedHistoryModal<PropertyTransactionSummary>
+          title="Related Transactions"
+          propertyId={property.property_id}
+          endpoint="transactions"
+          onClose={() => setExpanded(null)}
+          renderItems={(rows) => (
+            <TransactionList rows={rows} linkable={canViewTransactionsNav} />
+          )}
+        />
+      ) : null}
+      {expanded === "documents" ? (
+        <PaginatedHistoryModal<PropertyDocument>
+          title="Documents"
+          propertyId={property.property_id}
+          endpoint="documents"
+          onClose={() => setExpanded(null)}
+          renderItems={(rows) => <DocumentList rows={rows} />}
+        />
+      ) : null}
 
       <SharePropertyModal
         propertyId={property.property_id}
@@ -567,6 +476,322 @@ export function PropertyDetailsUI({ propertyId }: { propertyId: string }) {
         onClose={() => setShareModalOpen(false)}
       />
     </div>
+  );
+}
+
+type HistoryKind = "ownership" | "transactions" | "documents";
+
+const HISTORY_PAGE_SIZE = 10;
+
+function SectionHeader({
+  icon,
+  title,
+  shown,
+  total,
+  onShowMore
+}: {
+  icon: ReactNode;
+  title: string;
+  shown: number;
+  total: number;
+  onShowMore?: () => void;
+}) {
+  return (
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+      <h2 className="flex items-center gap-2 text-lg font-bold text-text-primary">
+        {icon}
+        {title}
+      </h2>
+      {total > shown ? (
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-text-muted">
+            Latest {shown} of {total}
+          </span>
+          {onShowMore ? (
+            <button
+              type="button"
+              onClick={onShowMore}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-text-primary transition-colors hover:bg-surface-subtle"
+            >
+              Show more
+              <Icons.ChevronRight className="h-4 w-4 text-text-muted" />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function OwnershipTable({ rows }: { rows: PropertyOwnershipHistory[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full border-collapse text-left text-sm">
+        <thead className="text-[11px] font-semibold tracking-wider text-text-muted uppercase">
+          <tr>
+            <th className="pb-3 pr-4">Owner</th>
+            <th className="pb-3 pr-4">Type</th>
+            <th className="pb-3 pr-4">Start</th>
+            <th className="pb-3 pr-4">End</th>
+            <th className="pb-3">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const ownerHref = userProfileHref(row.owner, row.owner_id);
+            const ownerName =
+              row.owner?.full_name?.trim() || row.owner_id?.trim() || "—";
+            return (
+              <tr
+                key={row.ownership_id}
+                className="border-t border-border-subtle"
+              >
+                <td className="py-3 pr-4 text-text-primary">
+                  {ownerHref ? (
+                    <Link
+                      href={ownerHref}
+                      className="font-medium text-link hover:text-link-hover"
+                    >
+                      {ownerName}
+                    </Link>
+                  ) : (
+                    ownerName
+                  )}
+                  {row.owner_id ? (
+                    <div className="mt-0.5 font-mono text-xs text-text-muted">
+                      {row.owner_id}
+                    </div>
+                  ) : null}
+                </td>
+                <td className="py-3 pr-4 text-text-secondary">
+                  {row.ownership_type?.trim() || "—"}
+                </td>
+                <td className="py-3 pr-4 text-text-secondary">
+                  {formatDate(row.ownership_start_date)}
+                </td>
+                <td className="py-3 pr-4 text-text-secondary">
+                  {formatDate(row.ownership_end_date)}
+                </td>
+                <td className="py-3">
+                  <StatusBadge
+                    label={(row.ownership_status ?? "—").toUpperCase()}
+                    variant={statusVariant(row.ownership_status)}
+                    size="sm"
+                  />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TransactionList({
+  rows,
+  linkable
+}: {
+  rows: PropertyTransactionSummary[];
+  linkable: boolean;
+}) {
+  return (
+    <ul className="divide-y divide-border-subtle">
+      {rows.map((tx) => (
+        <li
+          key={tx.transaction_id}
+          className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="min-w-0">
+            {linkable ? (
+              <Link
+                href={`/transactions/${encodeURIComponent(tx.transaction_id)}`}
+                className="font-mono text-sm text-link hover:text-link-hover"
+              >
+                {shortenId(tx.transaction_id, 8, 6)}
+              </Link>
+            ) : (
+              <span className="font-mono text-sm font-semibold text-text-primary">
+                {shortenId(tx.transaction_id, 8, 6)}
+              </span>
+            )}
+            <p className="text-xs text-text-muted">
+              {tx.registration_type ||
+                tx.transaction_group ||
+                tx.procedure_name ||
+                "Transaction"}{" "}
+              · {formatDateTime(tx.transaction_datetime)}
+            </p>
+            <p className="mt-1 text-xs text-text-secondary">
+              Seller:{" "}
+              {tx.seller?.user?.full_name?.trim() ||
+                tx.seller?.party_name?.trim() ||
+                "—"}
+              {" · "}
+              Buyer:{" "}
+              {tx.buyer?.user?.full_name?.trim() ||
+                tx.buyer?.party_name?.trim() ||
+                "—"}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-text-primary tabular-nums">
+              {formatMoney(tx.transaction_value) === "—"
+                ? "—"
+                : `${formatMoney(tx.transaction_value)} ${tx.currency?.trim() || "AED"}`}
+            </span>
+            <StatusBadge
+              label={(tx.status ?? "—").toUpperCase()}
+              variant={statusVariant(tx.status)}
+              size="sm"
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function DocumentList({ rows }: { rows: PropertyDocument[] }) {
+  return (
+    <ul className="flex flex-col gap-3">
+      {rows.map((doc) => (
+        <li
+          key={doc.document_id}
+          className="rounded-lg border border-border-subtle bg-surface-subtle/40 p-3"
+        >
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <span className="text-sm font-medium text-text-primary">
+              {doc.document_type?.trim() ||
+                doc.document_number?.trim() ||
+                `Document #${doc.document_id}`}
+            </span>
+            <StatusBadge
+              label={(doc.verification_status ?? "—").toUpperCase()}
+              variant={statusVariant(doc.verification_status)}
+              size="sm"
+            />
+          </div>
+          {doc.document_hash ? (
+            <CopyableHashBox
+              label="Document hash"
+              value={doc.document_hash}
+              displayValue={shortenId(doc.document_hash, 8, 6)}
+            />
+          ) : (
+            <p className="text-xs text-text-muted">No hash on record</p>
+          )}
+          <p className="mt-2 text-xs text-text-muted">
+            Issued {formatDate(doc.issued_date)}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function PaginatedHistoryModal<T>({
+  title,
+  propertyId,
+  endpoint,
+  onClose,
+  renderItems
+}: {
+  title: string;
+  propertyId: string;
+  endpoint: "ownership-history" | "transactions" | "documents";
+  onClose: () => void;
+  renderItems: (rows: T[]) => ReactNode;
+}) {
+  const [page, setPage] = useState(0);
+  const [data, setData] = useState<PaginatedList<T> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<PaginatedList<T>>(
+        `/api/v1/properties/${encodeURIComponent(propertyId)}/${endpoint}`,
+        { params: { skip: page * HISTORY_PAGE_SIZE, limit: HISTORY_PAGE_SIZE } }
+      )
+      .then(({ data: result }) => {
+        if (!cancelled) {
+          setData(result);
+          setError(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(`Unable to load ${title.toLowerCase()}.`);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [propertyId, endpoint, page, title]);
+
+  const total = data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE));
+  const first = total === 0 ? 0 : page * HISTORY_PAGE_SIZE + 1;
+  const last = Math.min(total, (page + 1) * HISTORY_PAGE_SIZE);
+
+  function goTo(next: number) {
+    setLoading(true);
+    setPage(next);
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={title}
+      subtitle={data ? `Showing ${first}–${last} of ${total}` : undefined}
+      footer={
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-text-muted">
+            Page {page + 1} of {pageCount}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => goTo(page - 1)}
+              disabled={loading || page === 0}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-text-primary transition-colors hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icons.ChevronLeft className="h-4 w-4" />
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => goTo(page + 1)}
+              disabled={loading || page + 1 >= pageCount}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-text-primary transition-colors hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next
+              <Icons.ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      }
+    >
+      {error ? (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      ) : loading && !data ? (
+        <p className="text-sm text-text-muted">Loading…</p>
+      ) : (
+        <div className={loading ? "opacity-60" : undefined}>
+          {renderItems(data?.items ?? [])}
+        </div>
+      )}
+    </Modal>
   );
 }
 

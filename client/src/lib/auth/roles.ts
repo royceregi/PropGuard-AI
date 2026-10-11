@@ -41,7 +41,7 @@ const ROUTE_ACCESS: Array<{
   },
   {
     prefix: "/dashboard/my-properties",
-    levels: ["SYSTEM", "PUBLIC"]
+    levels: ["PUBLIC"]
   },
   {
     prefix: "/profile",
@@ -69,11 +69,11 @@ const ROUTE_ACCESS: Array<{
   },
   {
     prefix: "/shared-properties",
-    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
+    levels: ["COMPANY", "PUBLIC"]
   },
   {
     prefix: "/blockchain-verification",
-    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
+    levels: ["SYSTEM", "REGISTRY", "COMPANY"]
   },
   {
     prefix: "/ai-investigation",

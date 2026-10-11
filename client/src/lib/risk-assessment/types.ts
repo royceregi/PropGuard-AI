@@ -1,7 +1,23 @@
 import type { StatusBadgeVariant } from "@/components/ui/StatusBadge";
 
 export type RiskRequestStatus =
-  "SUBMITTED" | "UNDER_REVIEW" | "VERIFIED" | "REJECTED";
+  "SUBMITTED" | "UNDER_REVIEW" | "VERIFIED" | "ISSUES_FOUND" | "REJECTED";
+
+/** Land Registry reviews in the workspace; requesters see the result drawer. */
+export function riskRequestHref(
+  requestId: string,
+  accessLevel: string
+): string {
+  const id = encodeURIComponent(requestId);
+  return accessLevel === "REGISTRY"
+    ? `/risk-analysis/review/${id}`
+    : `/risk-analysis?request=${id}`;
+}
+
+/** Review completed and the result was sent to the requester. */
+export function isCompletedResult(status: RiskRequestStatus): boolean {
+  return status === "VERIFIED" || status === "ISSUES_FOUND";
+}
 
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 export type PropertyAccessType = "OWNER" | "SHARED";
@@ -186,6 +202,7 @@ export const STATUS_LABELS: Record<RiskRequestStatus, string> = {
   SUBMITTED: "Submitted",
   UNDER_REVIEW: "Under review",
   VERIFIED: "Verified",
+  ISSUES_FOUND: "Issues found",
   REJECTED: "Rejected"
 };
 
@@ -193,6 +210,7 @@ export const STATUS_VARIANTS: Record<RiskRequestStatus, StatusBadgeVariant> = {
   SUBMITTED: "info",
   UNDER_REVIEW: "warning",
   VERIFIED: "success",
+  ISSUES_FOUND: "warning",
   REJECTED: "error"
 };
 

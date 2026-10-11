@@ -585,7 +585,7 @@ def refresh_features(db: Session, transaction_ids: list[str]) -> dict[str, int]:
 
 
 def ensure_feature_columns(conn: Any) -> None:
-    """Idempotently add the sql/012 columns (create_all never alters existing tables).
+    """Idempotently add the blockchain feature columns (create_all never alters existing tables).
     Takes a Connection or Session; the caller commits."""
     columns = {
         "property_hash_match": "BOOLEAN",

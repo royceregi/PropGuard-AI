@@ -1,7 +1,9 @@
 """Phase 5 — Information Retrieval API (07-information-retrieval.md).
 
-GET  /api/v1/retrieval/search  — ranked evidence for a natural-language or structured query.
-GET  /api/v1/retrieval/history — recent queries for the dashboard (admin / registry / company).
+GET  /api/v1/retrieval/search            — ranked evidence for a natural-language or structured query.
+GET  /api/v1/retrieval/query/{query_id}  — detailed evidence view of a past retrieval or
+                                           AI-assistant query (owner only for PUBLIC).
+GET  /api/v1/retrieval/history           — recent queries for the dashboard (admin / registry / company).
 
 Every query is logged in core.query_logs; evidence records go into core.query_retrievals.
 """
@@ -12,23 +14,58 @@ import time
 import uuid
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
-from app.api.property_access import is_public_viewer, scoped_property_ids
+from app.api.property_access import is_public_viewer
 from app.core.database import get_db
 from app.models.retrieval import QueryLog, QueryRetrieval
 from app.models.user import User as UserModel
 from app.schemas.retrieval import RetrievalHit, RetrievalResponse
-from app.services import retrieval_service
+from app.services import query_guard, retrieval_service, user_assistant_service
 
 router = APIRouter()
 
 ALL_ROLES = ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
 AUTHORITY_ROLES = ["SYSTEM", "REGISTRY", "COMPANY"]
 MAX_LIMIT = 50
+IR_AGENT = "IR-Agent"
 _SUSPICIOUS_INTENTS = retrieval_service.SUSPICIOUS_INTENTS
+_ORIGINS = {IR_AGENT: "retrieval", user_assistant_service.AGENT_NAME: "assistant"}
+
+
+def _guarded_search(
+    db: Session,
+    user: UserModel,
+    q: str,
+    *,
+    sources: list[str] | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int = 20,
+) -> tuple[dict, str | None]:
+    """(search result, restricted message). Same access rules as the AI assistant."""
+    guard = query_guard.guard_query(db, user, q)
+    if guard.unauthorized:
+        message = guard.restricted_message
+        return {
+            "interpreted": guard.parsed.to_dict(),
+            "sources": sources or list(retrieval_service.SOURCES),
+            "hits": [],
+            "counts": {},
+            "warnings": [message],
+        }, message
+    result = retrieval_service.search(
+        db,
+        q,
+        sources=sources,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+        property_scope=guard.property_scope,
+    )
+    return result, None
 
 
 def _log(
@@ -59,7 +96,7 @@ def _log(
             confidence_score=round(best_rel, 4),
             relevance_score=round(best_rel, 4),
             flagged_suspicious=suspicious,
-            agent_used="IR-Agent",
+            agent_used=IR_AGENT,
             response_time_ms=elapsed,
         )
         db.add(log)
@@ -95,25 +132,22 @@ def search(
     """
     Ranked evidence for one natural-language or structured query.
 
-    PUBLIC users are restricted to their own or shared properties.
-    Authority users (SYSTEM, REGISTRY, COMPANY) see all records.
+    PUBLIC users are restricted to their own or shared properties, and identifiers they
+    cannot access are refused. Authority users (SYSTEM, REGISTRY, COMPANY) see all records.
     """
-    property_scope = (
-        scoped_property_ids(db, current_user) if is_public_viewer(current_user) else None
-    )
     source_list = [s.strip().lower() for s in (sources or "").split(",") if s.strip()] or None
 
     started = time.monotonic()
     query_id = f"QRY{uuid.uuid4().hex[:8].upper()}"
 
-    result = retrieval_service.search(
+    result, restricted = _guarded_search(
         db,
+        current_user,
         q,
         sources=source_list,
         date_from=date_from,
         date_to=date_to,
         limit=limit,
-        property_scope=property_scope,
     )
 
     elapsed = int((time.monotonic() - started) * 1000)
@@ -128,7 +162,7 @@ def search(
         started_ms=started,
     )
 
-    ai_answer = retrieval_service.synthesize_retrieval_answer(q, result)
+    ai_answer = restricted or retrieval_service.synthesize_retrieval_answer(q, result)
 
     return RetrievalResponse(
         query_id=query_id,
@@ -139,6 +173,48 @@ def search(
         warnings=result["warnings"],
         response_time_ms=elapsed,
         ai_answer=ai_answer,
+        question=q,
+        origin="retrieval",
+    )
+
+
+@router.get("/query/{query_id}", response_model=RetrievalResponse)
+def query_detail(
+    query_id: str,
+    limit: int = Query(20, ge=1, le=MAX_LIMIT),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(require_roles(ALL_ROLES)),
+):
+    """
+    Detailed evidence for a past Evidence Retrieval or AI-assistant query.
+
+    The stored question is searched again under the caller's current access scope, and the
+    stored answer is returned as ``ai_answer`` so the page matches what the chat showed.
+    """
+    log = db.query(QueryLog).filter(QueryLog.query_id == query_id.strip()).first()
+    if (
+        log is None
+        or log.agent_used not in _ORIGINS
+        or (is_public_viewer(current_user) and log.user_id != current_user.user_id)
+    ):
+        raise HTTPException(status_code=404, detail="Query not found")
+
+    question = log.query_text or ""
+    started = time.monotonic()
+    result, restricted = _guarded_search(db, current_user, question, limit=limit)
+    elapsed = int((time.monotonic() - started) * 1000)
+
+    return RetrievalResponse(
+        query_id=log.query_id,
+        interpreted=result["interpreted"],
+        sources=result["sources"],
+        hits=[RetrievalHit(**h) for h in result["hits"]],
+        counts=result["counts"],
+        warnings=result["warnings"],
+        response_time_ms=elapsed,
+        ai_answer=restricted or log.agent_response,
+        question=question,
+        origin=_ORIGINS[log.agent_used],
     )
 
 
@@ -160,7 +236,7 @@ def recent_queries(
             QueryLog.flagged_suspicious,
             QueryLog.response_time_ms,
         )
-        .filter(QueryLog.agent_used == "IR-Agent")
+        .filter(QueryLog.agent_used == IR_AGENT)
         .order_by(QueryLog.log_timestamp.desc())
         .limit(limit)
         .all()

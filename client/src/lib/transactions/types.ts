@@ -61,6 +61,8 @@ export interface PaginatedPropertyTransactions {
 }
 
 export interface TransactionSearchFilters {
+  /** Free-text search (transaction, property, procedure, area, project). */
+  q: string;
   transactionId: string;
   propertyType: string;
   area: string;
@@ -72,6 +74,7 @@ export interface TransactionSearchFilters {
 }
 
 export const EMPTY_TRANSACTION_SEARCH_FILTERS: TransactionSearchFilters = {
+  q: "",
   transactionId: "",
   propertyType: "",
   area: "",
@@ -188,6 +191,9 @@ export function buildTransactionQueryParams(
     limit: pageSize
   };
 
+  if (filters.q.trim()) {
+    params.q = filters.q.trim();
+  }
   if (filters.transactionId.trim()) {
     params.transaction_id = filters.transactionId.trim();
   }
