@@ -8,10 +8,13 @@ import {
   ProfileMenuModal,
   type ProfileMenuAction
 } from "@/components/layout/ProfileMenuModal";
+import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { NewInvestigationMenu } from "@/components/layout/NewInvestigationMenu";
 import { NotificationsPopover } from "@/components/layout/NotificationsPopover";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import { ACCESS_LABELS } from "@/lib/auth/roles";
+import { isOperationalAccessLevel } from "@/lib/auth/types";
 
 export function TopNav({
   collapsed,
@@ -85,8 +88,6 @@ export function TopNav({
     }
   }
 
-  const isPublic = user?.access_level === "PUBLIC";
-
   return (
     <header className="sticky top-0 z-10 flex h-14 w-full items-center gap-2 border-b border-surface-subtle bg-surface px-3 text-text-primary sm:h-16 sm:gap-3 sm:px-4 lg:gap-6 lg:px-6 xl:px-8">
       <button
@@ -114,26 +115,13 @@ export function TopNav({
         </h1>
       </div>
 
-      {pathname.startsWith("/dashboard") && !isPublic ? (
-        <div className="relative hidden min-w-0 flex-1 md:block">
-          <Icons.Search className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-[20px] text-text-muted" />
-          <input
-            type="text"
-            placeholder="Search Wallet, TxID, Property Hash..."
-            className="h-9 w-full max-w-xs rounded-full border border-border-subtle bg-surface-canvas py-1.5 pl-10 pr-4 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-outline focus:bg-surface lg:max-w-xl xl:max-w-2xl"
-          />
-        </div>
+      {user && isOperationalAccessLevel(user.access_level) ? (
+        <GlobalSearch accessLevel={user.access_level} />
       ) : null}
 
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3 lg:gap-4">
-        {!isPublic ? (
-          <button
-            type="button"
-            className="flex items-center gap-2 rounded-lg bg-primary p-2 text-sm font-medium text-text-inverse transition-colors hover:bg-primary-hover sm:px-3 lg:px-4 lg:py-2"
-          >
-            <Icons.Add className="h-5 w-5 text-[20px]" />
-            <span className="hidden lg:inline">Start New Investigation</span>
-          </button>
+        {user && isOperationalAccessLevel(user.access_level) ? (
+          <NewInvestigationMenu accessLevel={user.access_level} />
         ) : null}
 
         <div className="relative hidden sm:block" ref={statusRef}>

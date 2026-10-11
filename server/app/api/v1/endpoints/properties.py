@@ -24,6 +24,9 @@ from app.schemas.property import (
 router = APIRouter()
 
 VIEW_ROLES = ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
+# Full per-property history lists; other users only get the latest rows via /full.
+HISTORY_ROLES = ["SYSTEM", "REGISTRY"]
+DETAIL_PREVIEW_LIMIT = 5
 
 
 @router.get("/", response_model=PaginatedProperties)
@@ -100,14 +103,14 @@ def get_property_full(
     if row is None:
         raise HTTPException(status_code=404, detail="Property not found")
 
-    documents, _ = property_repository.list_documents(
-        db, property_id=property_id, skip=0, limit=200
+    documents, documents_total = property_repository.list_documents(
+        db, property_id=property_id, skip=0, limit=DETAIL_PREVIEW_LIMIT
     )
-    transactions, _ = property_repository.list_transactions(
-        db, property_id=property_id, skip=0, limit=200
+    transactions, transactions_total = property_repository.list_transactions(
+        db, property_id=property_id, skip=0, limit=DETAIL_PREVIEW_LIMIT
     )
-    ownership, _ = property_repository.list_ownership_history(
-        db, property_id=property_id, skip=0, limit=200
+    ownership, ownership_total = property_repository.list_ownership_history(
+        db, property_id=property_id, skip=0, limit=DETAIL_PREVIEW_LIMIT
     )
     property_read = property_repository.enrich_properties(db, [row])[0]
     return PropertyDetailRead(
@@ -115,6 +118,9 @@ def get_property_full(
         documents=documents,
         transactions=property_repository.enrich_transactions(db, transactions),
         ownership_history=property_repository.enrich_ownership_rows(db, ownership),
+        documents_total=documents_total,
+        transactions_total=transactions_total,
+        ownership_history_total=ownership_total,
     )
 
 
@@ -127,7 +133,7 @@ def list_property_documents(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(HISTORY_ROLES)),
 ):
     ensure_property_access(db, current_user, property_id)
     if property_repository.get_property(db, property_id) is None:
@@ -147,7 +153,7 @@ def list_property_transactions(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(HISTORY_ROLES)),
 ):
     ensure_property_access(db, current_user, property_id)
     if property_repository.get_property(db, property_id) is None:
@@ -173,7 +179,7 @@ def list_property_ownership_history(
     limit: int = Query(50, ge=1, le=200),
     active_only: bool = False,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(require_roles(VIEW_ROLES)),
+    current_user: UserModel = Depends(require_roles(HISTORY_ROLES)),
 ):
     ensure_property_access(db, current_user, property_id)
     if property_repository.get_property(db, property_id) is None:

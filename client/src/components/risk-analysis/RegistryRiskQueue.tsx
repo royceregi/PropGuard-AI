@@ -11,6 +11,7 @@ import {
   EMPTY_QUEUE_FILTERS,
   requesterTypeLabel,
   STATUS_LABELS,
+  isCompletedResult,
   type QueueFilters,
   type RegistryQueue,
   type RiskRequestStatus
@@ -209,7 +210,8 @@ export function RegistryRiskQueue() {
               <tbody>
                 {queue.items.map((item) => {
                   const done =
-                    item.status === "VERIFIED" || item.status === "REJECTED";
+                    isCompletedResult(item.status) ||
+                    item.status === "REJECTED";
                   return (
                     <tr
                       key={item.request_id}

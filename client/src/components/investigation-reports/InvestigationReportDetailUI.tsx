@@ -7,7 +7,43 @@ import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Icons } from "@/components/icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { api } from "@/lib/api/client";
+import type { InvestigationReportData } from "@/lib/ai-investigation/types";
 import { formatDateTime, shortenId } from "@/lib/property-search/types";
+
+/** Backend agent_name -> position in the 4-agent pipeline. */
+const PIPELINE_STEPS: Record<string, { step: number; label: string }> = {
+  blockchain_retrieval_agent: { step: 1, label: "Blockchain Retrieval" },
+  transaction_analysis_agent: { step: 2, label: "Transaction Analysis" },
+  risk_detection_agent: { step: 3, label: "Risk & Fraud Detection" },
+  report_agent: { step: 4, label: "Report Synthesis" }
+};
+
+function riskVariant(
+  level: string
+): "success" | "warning" | "error" | "neutral" {
+  if (level === "HIGH") return "error";
+  if (level === "MEDIUM") return "warning";
+  if (level === "LOW") return "success";
+  return "neutral";
+}
+
+function checkVariant(
+  value: string
+): "success" | "warning" | "error" | "neutral" {
+  const v = value.toUpperCase();
+  if (v === "VALID" || v === "MATCH" || v === "PASS") return "success";
+  if (v === "WARN" || v === "UNCHECKED") return "warning";
+  if (v.includes("INVALID") || v === "MISMATCH" || v === "FAIL") return "error";
+  return "neutral";
+}
+
+/** Findings come from risk indicators (HIGH/MEDIUM/LOW) or registry checks (FAIL/WARN). */
+function severityVariant(
+  value: string
+): "success" | "warning" | "error" | "neutral" {
+  const risk = riskVariant(value.toUpperCase());
+  return risk !== "neutral" ? risk : checkVariant(value);
+}
 
 interface AgentRun {
   agent_run_id: number;
@@ -39,6 +75,7 @@ interface InvestigationReport {
   response_time_ms: number | null;
   agent_response: string | null;
   log_timestamp: string | null;
+  report: InvestigationReportData | null;
   agent_runs: AgentRun[];
   evidence: Evidence[];
 }
@@ -71,6 +108,7 @@ export function InvestigationReportDetailUI({ queryId }: { queryId: string }) {
         }
         setReport({
           ...data,
+          report: data.report ?? null,
           agent_runs: data.agent_runs || [],
           evidence: data.evidence || []
         });
@@ -212,6 +250,8 @@ export function InvestigationReportDetailUI({ queryId }: { queryId: string }) {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
+          {report.report ? <ReportSummary data={report.report} /> : null}
+
           <section className="flex flex-col rounded-xl border border-border bg-surface p-5 md:p-6">
             <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-text-primary">
               <Icons.Description className="h-[22px] w-[22px] text-text-muted" />
@@ -276,6 +316,7 @@ export function InvestigationReportDetailUI({ queryId }: { queryId: string }) {
                 <table className="min-w-full border-collapse text-left text-sm">
                   <thead className="bg-surface-subtle text-[11px] font-semibold tracking-wider text-text-muted uppercase">
                     <tr>
+                      <th className="px-4 py-3">Step</th>
                       <th className="px-4 py-3">Agent</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3">Confidence</th>
@@ -289,8 +330,15 @@ export function InvestigationReportDetailUI({ queryId }: { queryId: string }) {
                         key={run.agent_run_id}
                         className="border-t border-border-subtle"
                       >
+                        <td className="px-4 py-3 font-mono text-xs text-text-muted">
+                          {PIPELINE_STEPS[run.agent_name]?.step ?? "—"}
+                        </td>
                         <td className="px-4 py-3 font-medium text-text-primary">
-                          {run.agent_name}
+                          {PIPELINE_STEPS[run.agent_name]?.label ??
+                            run.agent_name}
+                          <span className="block font-mono text-[10px] font-normal text-text-muted">
+                            {run.agent_name}
+                          </span>
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge
@@ -434,6 +482,129 @@ export function InvestigationReportDetailUI({ queryId }: { queryId: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function ReportSummary({ data }: { data: InvestigationReportData }) {
+  const risk = data.risk_summary;
+  const verification = data.verification_summary;
+  const checks: { label: string; value: string }[] = verification
+    ? [
+        {
+          label: "Ledger record",
+          value: verification.ledger_record_exists ? "FOUND" : "MISSING"
+        },
+        { label: "Ledger integrity", value: verification.ledger_integrity },
+        { label: "Document hashes", value: verification.document_hash_status },
+        {
+          label: "Registry checks",
+          value: verification.registry_checks_overall
+        }
+      ]
+    : [];
+
+  return (
+    <section className="flex flex-col gap-5 rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-surface to-surface p-5 md:p-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="mr-auto flex items-center gap-2 text-lg font-bold text-text-primary">
+          <Icons.AutoAwesome className="h-[22px] w-[22px] text-primary" />
+          AI Investigation Report
+        </h2>
+        {risk ? (
+          <StatusBadge
+            label={`${risk.risk_level} risk · ${(Number(risk.risk_score) || 0).toFixed(2)}`}
+            variant={riskVariant(risk.risk_level)}
+            size="md"
+          />
+        ) : null}
+        {risk ? (
+          <StatusBadge
+            label={`${risk.indicator_count} indicator${risk.indicator_count === 1 ? "" : "s"}`}
+            variant="neutral"
+            size="md"
+          />
+        ) : null}
+      </div>
+
+      {data.executive_summary ? (
+        <div>
+          <span className="mb-1 block text-[10px] font-semibold tracking-wider text-text-muted uppercase">
+            Executive Summary
+          </span>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap text-text-primary">
+            {data.executive_summary}
+          </p>
+        </div>
+      ) : null}
+
+      {checks.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {checks.map((c) => (
+            <div
+              key={c.label}
+              className="rounded-lg border border-border-subtle bg-surface p-3"
+            >
+              <span className="mb-1.5 block text-[10px] font-semibold tracking-wider text-text-muted uppercase">
+                {c.label}
+              </span>
+              <StatusBadge
+                label={c.value}
+                variant={checkVariant(c.value)}
+                size="sm"
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {data.findings?.length ? (
+        <div>
+          <span className="mb-2 block text-[10px] font-semibold tracking-wider text-text-muted uppercase">
+            Findings
+          </span>
+          <ul className="space-y-2">
+            {data.findings.map((f, idx) => (
+              <li
+                key={`${f.code}-${idx}`}
+                className="rounded-lg border border-border-subtle bg-surface p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs font-semibold text-text-primary">
+                    {f.code}
+                  </span>
+                  <StatusBadge
+                    label={f.severity || "—"}
+                    variant={severityVariant(f.severity || "")}
+                    size="sm"
+                  />
+                </div>
+                <p className="mt-1 text-text-secondary">{f.description}</p>
+                {f.evidence_ids?.length ? (
+                  <p className="mt-1 font-mono text-[10px] break-all text-text-muted">
+                    {f.evidence_ids.join(" · ")}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {data.recommendation ? (
+        <div>
+          <span className="mb-1 block text-[10px] font-semibold tracking-wider text-text-muted uppercase">
+            Recommendation
+          </span>
+          <p className="text-sm text-text-primary">{data.recommendation}</p>
+        </div>
+      ) : null}
+
+      {data.responsible_ai_notice ? (
+        <p className="border-t border-border-subtle pt-3 text-xs text-text-muted">
+          {data.responsible_ai_notice}
+        </p>
+      ) : null}
+    </section>
   );
 }
 

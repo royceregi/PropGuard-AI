@@ -49,10 +49,12 @@ def log_run(
     output: dict[str, Any] | None,
     started_at: datetime,
     error: str | None = None,
+    query_id: str | None = None,
 ) -> int | None:
     """Store one agent execution. Logging must never break the investigation itself."""
     try:
         run = AgentRun(
+            query_id=query_id,
             agent_name=agent_name,
             input_data=_json(input_data),
             output_data=_json(output) if output is not None else None,

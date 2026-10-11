@@ -195,6 +195,7 @@ def run(
     analysis_output: dict[str, Any],
     risk_output: dict[str, Any],
     assessment: dict[str, Any] | None,
+    query_id: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Execute Report Agent.
 
@@ -255,5 +256,7 @@ def run(
         evidence_ids=all_evidence,
         warnings=warnings,
     )
-    log_run(db, AGENT_NAME, input_data=input_data, output=output, started_at=started)
+    log_run(
+        db, AGENT_NAME, input_data=input_data, output=output, started_at=started, query_id=query_id
+    )
     return output, report

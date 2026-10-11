@@ -91,6 +91,16 @@ export interface PropertyDetail extends PropertyRecord {
   documents: PropertyDocument[];
   transactions: PropertyTransactionSummary[];
   ownership_history: PropertyOwnershipHistory[];
+  documents_total: number;
+  transactions_total: number;
+  ownership_history_total: number;
+}
+
+export interface PaginatedList<T> {
+  items: T[];
+  total: number;
+  skip: number;
+  limit: number;
 }
 
 export interface PaginatedProperties {
@@ -122,7 +132,14 @@ export const EMPTY_PROPERTY_SEARCH_FILTERS: PropertySearchFilters = {
 
 export const PROPERTY_PAGE_SIZE = 12;
 
-export function shortenId(value: string, head = 6, tail = 4): string {
+export function shortenId(
+  value: string | null | undefined,
+  head = 6,
+  tail = 4
+): string {
+  if (!value) {
+    return "—";
+  }
   if (value.length <= head + tail + 3) {
     return value;
   }

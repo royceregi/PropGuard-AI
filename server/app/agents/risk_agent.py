@@ -31,6 +31,7 @@ def run(
     db: Session,
     retrieval_output: dict[str, Any],
     evaluation: dict[str, Any],
+    query_id: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
     """(agent output, stored assessment)."""
     started = datetime.now()
@@ -45,7 +46,13 @@ def run(
         )
     except Exception as exc:
         log_run(
-            db, AGENT_NAME, input_data=input_data, output=None, started_at=started, error=str(exc)
+            db,
+            AGENT_NAME,
+            input_data=input_data,
+            output=None,
+            started_at=started,
+            error=str(exc),
+            query_id=query_id,
         )
         raise
 
@@ -97,14 +104,18 @@ def run(
         evidence_ids=retrieval_output["evidence_ids"],
         warnings=warnings,
     )
-    log_run(db, AGENT_NAME, input_data=input_data, output=output, started_at=started)
+    log_run(
+        db, AGENT_NAME, input_data=input_data, output=output, started_at=started, query_id=query_id
+    )
     return output, assessment
 
 
-def investigate(db: Session, transaction_id: str) -> dict[str, Any] | None:
+def investigate(
+    db: Session, transaction_id: str, query_id: str | None = None
+) -> dict[str, Any] | None:
     """Retrieval Agent → Risk Agent. None when the transaction has no ledger record."""
-    retrieval, evaluation = retrieval_agent.run(db, transaction_id)
+    retrieval, evaluation = retrieval_agent.run(db, transaction_id, query_id=query_id)
     if evaluation is None:
         return None
-    risk, assessment = run(db, retrieval, evaluation)
+    risk, assessment = run(db, retrieval, evaluation, query_id=query_id)
     return {"assessment": assessment, "agents": [retrieval, risk]}

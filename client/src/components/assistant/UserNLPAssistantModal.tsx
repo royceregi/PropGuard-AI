@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowUpRight,
   Bot,
   CheckCircle2,
   FileText,
@@ -10,12 +12,17 @@ import {
   Maximize2,
   Minimize2,
   Send,
+  ShieldAlert,
   Sparkles,
   Trash2,
   X
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api/client";
+import { useAssistantStore } from "@/lib/assistant/store";
+import { evidenceHref } from "@/lib/retrieval/types";
+
+type AssistantMode = "retrieval" | "investigation" | "restricted";
 
 interface SourceItem {
   source_type: string;
@@ -24,7 +31,14 @@ interface SourceItem {
   details?: string | null;
 }
 
-interface MessageItem {
+interface AnswerLinks {
+  mode?: AssistantMode;
+  detail_url?: string | null;
+  investigation_id?: string | null;
+  risk_level?: string | null;
+}
+
+interface MessageItem extends AnswerLinks {
   id: string;
   role: "user" | "assistant";
   content: string;
@@ -34,7 +48,7 @@ interface MessageItem {
   warnings?: string[];
 }
 
-interface HistoryResponseItem {
+interface HistoryResponseItem extends AnswerLinks {
   query_id: string;
   question: string;
   answer: string;
@@ -43,7 +57,7 @@ interface HistoryResponseItem {
   sources: SourceItem[];
 }
 
-interface QueryResponse {
+interface QueryResponse extends AnswerLinks {
   query_id: string;
   question: string;
   answer: string;
@@ -62,12 +76,61 @@ const QUICK_PROMPTS = [
   "What documents are registered under my property?"
 ];
 
+const RISK_BADGE: Record<string, string> = {
+  HIGH: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+  MEDIUM: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  LOW: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+};
+
+function AnswerActions({
+  msg,
+  onNavigate
+}: {
+  msg: MessageItem;
+  onNavigate: () => void;
+}) {
+  if (!msg.detail_url || msg.mode === "restricted") return null;
+  const isInvestigation = msg.mode === "investigation";
+  return (
+    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-border/40 pt-2">
+      {isInvestigation && msg.risk_level ? (
+        <span
+          className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+            RISK_BADGE[msg.risk_level] ?? "bg-surface text-text-secondary"
+          }`}
+        >
+          <ShieldAlert className="h-3 w-3" />
+          {msg.risk_level} risk
+        </span>
+      ) : null}
+      <Link
+        href={msg.detail_url}
+        onClick={onNavigate}
+        className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/5 px-2 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10"
+      >
+        {isInvestigation
+          ? "Open investigation report"
+          : "View detailed evidence"}
+        <ArrowUpRight className="h-3 w-3" />
+      </Link>
+    </div>
+  );
+}
+
 export function UserNLPAssistantModal() {
   const { user } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
+  const isOpen = useAssistantStore((state) => state.isOpen);
+  const draft = useAssistantStore((state) => state.draft);
+  const closeAssistant = useAssistantStore((state) => state.close);
+  const toggleAssistant = useAssistantStore((state) => state.toggle);
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputQuestion, setInputQuestion] = useState("");
+  const [appliedDraftId, setAppliedDraftId] = useState<number | null>(null);
+  if (draft && draft.id !== appliedDraftId) {
+    setAppliedDraftId(draft.id);
+    setInputQuestion(draft.text);
+  }
   const [isLoading, setIsLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -107,7 +170,11 @@ export function UserNLPAssistantModal() {
             content: item.answer,
             timestamp: item.timestamp,
             confidence: item.confidence_score,
-            sources: item.sources
+            sources: item.sources,
+            mode: item.mode,
+            detail_url: item.detail_url,
+            investigation_id: item.investigation_id,
+            risk_level: item.risk_level
           });
         }
         setMessages(loaded);
@@ -136,10 +203,9 @@ export function UserNLPAssistantModal() {
   }, [messages, isLoading]);
 
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 150);
-    }
-  }, [isOpen]);
+    if (!isOpen) return;
+    setTimeout(() => inputRef.current?.focus(), 150);
+  }, [isOpen, draft]);
 
   if (!isEligible) {
     return null;
@@ -176,7 +242,11 @@ export function UserNLPAssistantModal() {
         timestamp: data.timestamp,
         confidence: data.confidence_score,
         sources: data.sources,
-        warnings: data.warnings
+        warnings: data.warnings,
+        mode: data.mode,
+        detail_url: data.detail_url,
+        investigation_id: data.investigation_id,
+        risk_level: data.risk_level
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -228,7 +298,7 @@ export function UserNLPAssistantModal() {
       <div className="fixed bottom-6 right-6 z-40">
         <button
           type="button"
-          onClick={() => setIsOpen((prev) => !prev)}
+          onClick={toggleAssistant}
           className="group relative flex h-14 w-14 items-center justify-center rounded-full bg-primary text-text-inverse shadow-xl transition-all duration-300 hover:scale-105 hover:bg-primary-hover hover:shadow-2xl active:scale-95 focus:outline-none focus:ring-4 focus:ring-primary/20"
           aria-label="Open AI Property Assistant"
           title="AI Property Assistant (Natural Language Query)"
@@ -307,7 +377,7 @@ export function UserNLPAssistantModal() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsOpen(false)}
+                  onClick={closeAssistant}
                   title="Close Assistant"
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface hover:text-text-primary"
                 >
@@ -364,6 +434,13 @@ export function UserNLPAssistantModal() {
                         {prompt}
                       </button>
                     ))}
+                    <p className="pt-1 text-[10px] text-text-muted">
+                      Tip: ask &ldquo;Is my property safe?&rdquo; or include a
+                      transaction ID, e.g. &ldquo;Is transaction
+                      1-102-2021-10436 risky?&rdquo;, to run a full AI
+                      investigation. Follow-ups like &ldquo;is it risky?&rdquo;
+                      use the previous answer.
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -392,18 +469,49 @@ export function UserNLPAssistantModal() {
                               Referenced Records:
                             </p>
                             <div className="flex flex-wrap gap-1">
-                              {msg.sources.map((s, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 text-[10px] font-mono text-text-secondary border border-border/50"
-                                >
-                                  <FileText className="h-2.5 w-2.5 text-primary" />
-                                  {s.title}
-                                </span>
-                              ))}
+                              {msg.sources.map((s, idx) => {
+                                const href = evidenceHref(s.source_type, {
+                                  record_id: s.identifier
+                                });
+                                const tagClass =
+                                  "inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 text-[10px] font-mono text-text-secondary border border-border/50";
+                                const body = (
+                                  <>
+                                    <FileText className="h-2.5 w-2.5 text-primary" />
+                                    {s.title}
+                                  </>
+                                );
+                                return href ? (
+                                  <Link
+                                    key={idx}
+                                    href={href}
+                                    title={s.details ?? s.title}
+                                    className={`${tagClass} transition-colors hover:border-primary/50 hover:text-primary`}
+                                  >
+                                    {body}
+                                  </Link>
+                                ) : (
+                                  <span
+                                    key={idx}
+                                    title={s.details ?? s.title}
+                                    className={tagClass}
+                                  >
+                                    {body}
+                                  </span>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
+
+                      {msg.role === "assistant" && (
+                        <AnswerActions
+                          msg={msg}
+                          onNavigate={() => {
+                            if (isExpanded) closeAssistant();
+                          }}
+                        />
+                      )}
                     </div>
                     <span className="mt-1 px-1 text-[9px] text-text-muted">
                       {new Date(msg.timestamp).toLocaleTimeString([], {
@@ -419,7 +527,10 @@ export function UserNLPAssistantModal() {
                 <div className="flex items-start gap-2">
                   <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-none border border-border bg-surface-subtle p-3 text-text-muted">
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span>Analyzing property records with NLP…</span>
+                    <span>
+                      Analyzing property records with NLP… (risk questions run
+                      all 4 AI agents and can take longer)
+                    </span>
                   </div>
                 </div>
               )}

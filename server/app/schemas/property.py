@@ -146,9 +146,14 @@ class PropertyTransactionDetailRead(PropertyTransactionRead):
 
 
 class PropertyDetailRead(PropertyRead):
+    """Latest few rows of each list; the *_total fields give the full counts."""
+
     documents: list[PropertyDocumentRead] = Field(default_factory=list)
     transactions: list[PropertyTransactionRead] = Field(default_factory=list)
     ownership_history: list[PropertyOwnershipHistoryRead] = Field(default_factory=list)
+    documents_total: int = 0
+    transactions_total: int = 0
+    ownership_history_total: int = 0
 
 
 class PaginatedProperties(BaseModel):

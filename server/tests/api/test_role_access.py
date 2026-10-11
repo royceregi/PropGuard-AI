@@ -28,25 +28,30 @@ def mock_db_session():
     return db
 
 
-def test_public_user_analytics_access():
+def test_public_user_analytics_forbidden():
     user = mock_user("USR-001", "PUBLIC")
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db] = mock_db_session
 
     try:
+        res = client.get("/api/v1/analytics/dashboard")
+        assert res.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_company_analytics_hides_recent_queries():
+    user = mock_user("USR-002", "COMPANY")
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_db] = mock_db_session
+
+    try:
         with patch("app.services.analytics_service.get_dashboard_analytics") as mock_stats:
-            mock_stats.return_value = {
-                "summary": {"total_transactions": 10, "verified_transactions": 8},
-                "risk_distribution": {},
-                "transactions_by_month": [],
-                "transactions_by_area": [],
-                "recent_queries": [],
-            }
+            mock_stats.return_value = {"summary": {"total_transactions": 10}}
             res = client.get("/api/v1/analytics/dashboard")
             assert res.status_code == 200
-            data = res.json()
-            assert "summary" in data
-            assert data["summary"]["total_transactions"] == 10
+            assert res.json()["summary"]["total_transactions"] == 10
+            assert mock_stats.call_args.kwargs["include_recent_queries"] is False
     finally:
         app.dependency_overrides.clear()
 

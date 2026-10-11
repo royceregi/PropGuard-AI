@@ -43,7 +43,9 @@ def _evidence_ids(evaluation: dict[str, Any]) -> list[str]:
     return ids
 
 
-def run(db: Session, transaction_id: str) -> tuple[dict[str, Any], dict[str, Any] | None]:
+def run(
+    db: Session, transaction_id: str, query_id: str | None = None
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
     """(agent output, full evaluation for the next agent). Evaluation is None when not found."""
     started = datetime.now()
     input_data = {"transaction_id": transaction_id}
@@ -51,7 +53,13 @@ def run(db: Session, transaction_id: str) -> tuple[dict[str, Any], dict[str, Any
         evaluation = blockchain_risk_service.evaluate(db, transaction_id)
     except Exception as exc:
         log_run(
-            db, AGENT_NAME, input_data=input_data, output=None, started_at=started, error=str(exc)
+            db,
+            AGENT_NAME,
+            input_data=input_data,
+            output=None,
+            started_at=started,
+            error=str(exc),
+            query_id=query_id,
         )
         raise
 
@@ -64,7 +72,14 @@ def run(db: Session, transaction_id: str) -> tuple[dict[str, Any], dict[str, Any
             evidence_ids=[],
             warnings=["No blockchain ledger record exists for this transaction."],
         )
-        log_run(db, AGENT_NAME, input_data=input_data, output=output, started_at=started)
+        log_run(
+            db,
+            AGENT_NAME,
+            input_data=input_data,
+            output=output,
+            started_at=started,
+            query_id=query_id,
+        )
         return output, None
 
     verify = evaluation["verification"]
@@ -108,5 +123,7 @@ def run(db: Session, transaction_id: str) -> tuple[dict[str, Any], dict[str, Any
         evidence_ids=_evidence_ids(evaluation),
         warnings=warnings,
     )
-    log_run(db, AGENT_NAME, input_data=input_data, output=output, started_at=started)
+    log_run(
+        db, AGENT_NAME, input_data=input_data, output=output, started_at=started, query_id=query_id
+    )
     return output, evaluation

@@ -1,5 +1,5 @@
 # PropGuard AI — Backend Makefile
-.PHONY: lint format format-check fix typecheck test check dev run clean help
+.PHONY: env lint format format-check fix typecheck test check dev run clean help
 
 VENV = .venv
 PYTHON = $(VENV)/bin/python
@@ -12,6 +12,7 @@ ENV_VARS = DATABASE_URL="postgresql://user:pass@localhost:5432/testdb" SECRET_KE
 
 help:
 	@echo "PropGuard AI Backend Commands:"
+	@echo "  make env           - Create .env from .env.example with a new SECRET_KEY (ARGS=--registry-key / --force)"
 	@echo "  make lint          - Run Ruff linter"
 	@echo "  make format        - Format code with Ruff"
 	@echo "  make format-check  - Check code formatting"
@@ -20,6 +21,9 @@ help:
 	@echo "  make test          - Run Pytest test suite"
 	@echo "  make check         - Run full check suite (lint, format-check, typecheck, test)"
 	@echo "  make dev           - Start local development server with auto-reload"
+
+env:
+	$(PYTHON) scripts/create_env.py $(ARGS)
 
 lint:
 	$(RUFF) check .

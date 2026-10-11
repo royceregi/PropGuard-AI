@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { UserManagementUI } from "@/components/users/UserManagementUI";
 
 export const metadata: Metadata = {
@@ -6,5 +7,11 @@ export const metadata: Metadata = {
 };
 
 export default function UsersPage() {
-  return <UserManagementUI />;
+  return (
+    <Suspense
+      fallback={<p className="p-6 text-sm text-text-muted">Loading users…</p>}
+    >
+      <UserManagementUI />
+    </Suspense>
+  );
 }

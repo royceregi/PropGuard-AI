@@ -8,14 +8,17 @@ import {
   useState
 } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icons } from "@/components/icons";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api/client";
+import { useAssistantStore } from "@/lib/assistant/store";
 import { apiErrorMessage } from "@/lib/risk-assessment/types";
 import {
   INTENT_LABELS,
   SOURCE_LABELS,
+  evidenceHref,
   matchLabel,
   matchVariant,
   type RetrievalHit,
@@ -64,15 +67,18 @@ function RelevanceBar({ score }: { score: number }) {
   );
 }
 
-function HitCard({ hit }: { hit: RetrievalHit }) {
-  const href =
-    hit.source === "transaction" && hit.transaction_id
-      ? `/transactions/${encodeURIComponent(hit.transaction_id)}`
-      : hit.source === "property" && hit.property_id
-        ? `/property-search/${encodeURIComponent(hit.property_id)}`
-        : hit.source === "document" && hit.property_id
-          ? `/property-search/${encodeURIComponent(hit.property_id)}`
-          : null;
+function HitCard({
+  hit,
+  investigating,
+  onInvestigate
+}: {
+  hit: RetrievalHit;
+  investigating: boolean;
+  onInvestigate: (transactionId: string) => void;
+}) {
+  const href = evidenceHref(hit.source, hit);
+  const investigateId =
+    hit.source === "transaction" ? hit.transaction_id : null;
 
   const intentLabel =
     hit.intent && hit.intent in INTENT_LABELS
@@ -103,14 +109,32 @@ function HitCard({ hit }: { hit: RetrievalHit }) {
               <StatusBadge label={intentLabel} variant="warning" size="sm" />
             )}
             <RelevanceBar score={hit.relevance_score} />
-            {href && (
-              <Link
-                href={href}
-                className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-link hover:text-link-hover"
-              >
-                Open <Icons.OpenInNew className="h-3.5 w-3.5" />
-              </Link>
-            )}
+            <div className="ml-auto flex items-center gap-3">
+              {investigateId && (
+                <button
+                  type="button"
+                  disabled={investigating}
+                  onClick={() => onInvestigate(investigateId)}
+                  title="Run the 4-agent AI investigation for this transaction"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-link hover:text-link-hover disabled:opacity-60"
+                >
+                  {investigating ? (
+                    <Icons.HourglassEmpty className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Icons.SmartToy className="h-3.5 w-3.5" />
+                  )}
+                  {investigating ? "Investigating…" : "Run investigation"}
+                </button>
+              )}
+              {href && (
+                <Link
+                  href={href}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-link hover:text-link-hover"
+                >
+                  Open <Icons.OpenInNew className="h-3.5 w-3.5" />
+                </Link>
+              )}
+            </div>
           </div>
 
           {/* Title / subtitle */}
@@ -236,8 +260,18 @@ function HistoryTable({ rows }: { rows: RetrievalHistoryRow[] }) {
 
 // ─── main ────────────────────────────────────────────────────────────────────
 
-export function RetrievalUI() {
+export function RetrievalUI({
+  linkedQueryId = null,
+  initialQuery = null
+}: {
+  /** Past query (e.g. from the AI assistant) to show in detail. */
+  linkedQueryId?: string | null;
+  /** Query text to search immediately. */
+  initialQuery?: string | null;
+} = {}) {
   const { user } = useAuth();
+  const router = useRouter();
+  const openAssistant = useAssistantStore((state) => state.open);
   const isAuthority =
     user?.access_level === "SYSTEM" ||
     user?.access_level === "REGISTRY" ||
@@ -245,13 +279,16 @@ export function RetrievalUI() {
 
   const [queryText, setQueryText] = useState("");
   const [source, setSource] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(
+    Boolean(linkedQueryId || initialQuery)
+  );
   const [result, setResult] = useState<RetrievalResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [historyLoading, setHistoryLoading] = useState(false);
   const [history, setHistory] = useState<RetrievalHistoryRow[] | null>(null);
   const [activeTab, setActiveTab] = useState<"results" | "history">("results");
+  const [investigatingId, setInvestigatingId] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const hasLoadedHistoryRef = useRef(false);
@@ -296,6 +333,68 @@ export function RetrievalUI() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!linkedQueryId && !initialQuery) return;
+    let cancelled = false;
+
+    const request = linkedQueryId
+      ? api.get<RetrievalResponse>(
+          `/api/v1/retrieval/query/${encodeURIComponent(linkedQueryId)}`,
+          { params: { limit: "20" } }
+        )
+      : api.get<RetrievalResponse>("/api/v1/retrieval/search", {
+          params: { q: initialQuery, limit: "20" }
+        });
+
+    request
+      .then(({ data }) => {
+        if (cancelled) return;
+        setResult(data);
+        setQueryText(data.question ?? initialQuery ?? "");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(
+          apiErrorMessage(
+            err,
+            linkedQueryId
+              ? "This query is no longer available."
+              : "Search failed. Try rephrasing your query."
+          )
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [linkedQueryId, initialQuery]);
+
+  async function runInvestigation(transactionId: string) {
+    setInvestigatingId(transactionId);
+    setError(null);
+    try {
+      const { data } = await api.post<{ query_id: string }>(
+        `/api/v1/investigations/${encodeURIComponent(transactionId)}`
+      );
+      router.push(
+        `/investigation-reports/${encodeURIComponent(data.query_id)}`
+      );
+    } catch (err) {
+      setError(
+        apiErrorMessage(
+          err,
+          `Could not run the investigation for ${transactionId}.`
+        )
+      );
+      setInvestigatingId(null);
+    }
+  }
+
+  const fromAssistant = result?.origin === "assistant";
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -418,6 +517,25 @@ export function RetrievalUI() {
       {/* Results tab */}
       {activeTab === "results" && result && (
         <div className="space-y-4">
+          {fromAssistant && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-xs text-text-secondary">
+              <Icons.SmartToy className="h-4 w-4 shrink-0 text-primary" />
+              <span>
+                Opened from the AI Assistant — detailed evidence for your
+                question
+                {result.question ? (
+                  <>
+                    {" "}
+                    <span className="font-medium text-text-primary">
+                      &ldquo;{result.question}&rdquo;
+                    </span>
+                  </>
+                ) : null}
+                .
+              </span>
+            </div>
+          )}
+
           {/* AI Natural Language Answer Panel */}
           {result.ai_answer && (
             <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/10 via-surface to-surface p-5 shadow-sm">
@@ -426,7 +544,9 @@ export function RetrievalUI() {
                   <Icons.AutoAwesome className="h-4 w-4" />
                 </div>
                 <h3 className="text-sm font-bold text-text-primary">
-                  AI Natural Language Answer
+                  {fromAssistant
+                    ? "AI Assistant Answer"
+                    : "AI Natural Language Answer"}
                 </h3>
                 <span className="ml-auto inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                   NLP Processed
@@ -435,6 +555,14 @@ export function RetrievalUI() {
               <p className="text-sm leading-relaxed text-text-primary whitespace-pre-wrap">
                 {result.ai_answer}
               </p>
+              <button
+                type="button"
+                onClick={() => openAssistant(result.question ?? queryText)}
+                className={`${BUTTON_GHOST} mt-3 -ml-2.5 text-primary`}
+              >
+                <Icons.SmartToy className="h-4 w-4" />
+                Ask the assistant about this
+              </button>
             </div>
           )}
 
@@ -488,7 +616,12 @@ export function RetrievalUI() {
           ) : (
             <div className="space-y-2">
               {result.hits.map((hit) => (
-                <HitCard key={hit.evidence_id} hit={hit} />
+                <HitCard
+                  key={hit.evidence_id}
+                  hit={hit}
+                  investigating={investigatingId === hit.transaction_id}
+                  onInvestigate={(tid) => void runInvestigation(tid)}
+                />
               ))}
             </div>
           )}

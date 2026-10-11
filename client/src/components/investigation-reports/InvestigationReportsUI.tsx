@@ -10,7 +10,7 @@ import { formatDateTime, shortenId } from "@/lib/property-search/types";
 
 interface InvestigationReport {
   query_id: string;
-  user_id: string;
+  user_id: string | null;
   query_text: string;
   agent_used: string;
   confidence_score: number | null;

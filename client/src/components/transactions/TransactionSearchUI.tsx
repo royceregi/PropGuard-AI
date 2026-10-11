@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { isAxiosError } from "axios";
+import { SearchTermChip } from "@/components/ui/SearchTermChip";
 import { ForensicFilters } from "@/components/transactions/ForensicFilters";
 import { InvestigationResults } from "@/components/transactions/InvestigationResults";
 import { TransactionCard } from "@/components/transactions/TransactionCard";
@@ -25,15 +27,27 @@ function visiblePages(current: number, totalPages: number): number[] {
 }
 
 export function TransactionSearchUI() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParam = useSearchParams().get("search")?.trim() ?? "";
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [filters, setFilters] = useState<TransactionSearchFilters>(
-    EMPTY_TRANSACTION_SEARCH_FILTERS
-  );
+  const [filters, setFilters] = useState<TransactionSearchFilters>({
+    ...EMPTY_TRANSACTION_SEARCH_FILTERS,
+    q: searchParam
+  });
+  const [syncedSearch, setSyncedSearch] = useState(searchParam);
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<PropertyTransaction[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  if (searchParam !== syncedSearch) {
+    setSyncedSearch(searchParam);
+    setLoading(true);
+    setPage(1);
+    setFilters({ ...EMPTY_TRANSACTION_SEARCH_FILTERS, q: searchParam });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +100,16 @@ export function TransactionSearchUI() {
     setError(null);
     setPage(1);
     setFilters(EMPTY_TRANSACTION_SEARCH_FILTERS);
+    if (searchParam) {
+      router.replace(pathname, { scroll: false });
+    }
+  }
+
+  function clearSearchTerm() {
+    setLoading(true);
+    setPage(1);
+    setFilters((current) => ({ ...current, q: "" }));
+    router.replace(pathname, { scroll: false });
   }
 
   function handlePageChange(nextPage: number) {
@@ -99,11 +123,16 @@ export function TransactionSearchUI() {
   return (
     <div className="flex flex-col gap-6">
       <ForensicFilters
+        key={syncedSearch}
         initialValues={filters}
         loading={loading}
         onSubmit={handleSubmit}
         onClear={handleClear}
       />
+
+      {filters.q ? (
+        <SearchTermChip term={filters.q} onClear={clearSearchTerm} />
+      ) : null}
 
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-bold text-text-primary md:text-lg">

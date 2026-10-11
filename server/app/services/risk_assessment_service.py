@@ -17,6 +17,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import HTTPException, status
+from sqlalchemy import and_, not_, or_
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -42,6 +43,8 @@ SUBMITTED = "SUBMITTED"
 UNDER_REVIEW = "UNDER_REVIEW"
 VERIFIED = "VERIFIED"
 REJECTED = "REJECTED"
+# Not a stored status: a VERIFIED request with at least one section marked as an issue.
+ISSUES_FOUND = "ISSUES_FOUND"
 ACTIVE_STATUSES = {SUBMITTED, UNDER_REVIEW}
 
 SNAPSHOT_SECTIONS: dict[str, tuple[str, ...]] = {
@@ -571,6 +574,26 @@ def _property_map(db: Session, property_ids: set[str]) -> dict[str, Property]:
     }
 
 
+def _issue_sections(req: RiskAssessmentRequest) -> list[str]:
+    checks = req.verification_checks or {}
+    return [key for key in VERIFICATION_SECTIONS if checks.get(key) is False]
+
+
+def _api_status(req: RiskAssessmentRequest) -> str:
+    if req.status == VERIFIED and _issue_sections(req):
+        return ISSUES_FOUND
+    return req.status
+
+
+def _any_issue_filter():
+    return or_(
+        *(
+            RiskAssessmentRequest.verification_checks.contains({key: False})
+            for key in VERIFICATION_SECTIONS
+        )
+    )
+
+
 def _summary(
     req: RiskAssessmentRequest,
     users: dict[str, User],
@@ -582,7 +605,7 @@ def _summary(
         "request_id": req.request_id,
         "property_id": req.property_id,
         "property_title": _title(props.get(req.property_id), req.submitted_snapshot),
-        "status": req.status,
+        "status": _api_status(req),
         "submitted_at": req.submitted_at,
         "completed_at": req.completed_at,
         "risk_score": req.risk_score
@@ -638,7 +661,7 @@ def _detail(db: Session, req: RiskAssessmentRequest, viewer: User) -> dict[str, 
                 }
                 for event in (req.history or [])
             ],
-            "can_download_certificate": verified,
+            "can_download_certificate": verified and not _issue_sections(req),
         }
     )
     return data
@@ -840,7 +863,17 @@ def registry_queue(
 ) -> dict[str, Any]:
     query = db.query(RiskAssessmentRequest)
     if status_filter:
-        query = query.filter(RiskAssessmentRequest.status == status_filter.upper())
+        wanted = status_filter.upper()
+        if wanted == ISSUES_FOUND:
+            query = query.filter(
+                and_(RiskAssessmentRequest.status == VERIFIED, _any_issue_filter())
+            )
+        elif wanted == VERIFIED:
+            query = query.filter(
+                and_(RiskAssessmentRequest.status == VERIFIED, not_(_any_issue_filter()))
+            )
+        else:
+            query = query.filter(RiskAssessmentRequest.status == wanted)
     if requester_type:
         query = query.filter(RiskAssessmentRequest.requester_access_level == requester_type.upper())
     if submitted_from:
@@ -978,14 +1011,14 @@ def verify_and_send(
     _require_under_review(req)
     _merge_checks(req, checks)
 
-    unverified = [
-        key for key in VERIFICATION_SECTIONS if (req.verification_checks or {}).get(key) is not True
+    unchecked = [
+        key for key in VERIFICATION_SECTIONS if (req.verification_checks or {}).get(key) is None
     ]
-    if unverified:
-        labels = ", ".join(key.replace("_", " ") for key in unverified)
+    if unchecked:
+        labels = ", ".join(key.replace("_", " ") for key in unchecked)
         raise HTTPException(
             status_code=400,
-            detail=f"Verify every section before sending the result (outstanding: {labels}). Reject the request if the information is incorrect.",
+            detail=f"Mark every section as Verified or Issue found before sending the result (not checked: {labels}).",
         )
 
     prop = property_repository.get_property(db, req.property_id)
@@ -997,12 +1030,23 @@ def verify_and_send(
     req.completed_at = _now()
     req.status = VERIFIED
     req.result_hash = _result_hash(req)
-    _add_history(
-        req,
-        VERIFIED,
-        user,
-        f"Assessment verified: {req.risk_level} risk ({risk_score}/100). Result sent to requester.",
-    )
+    issues = _issue_sections(req)
+    if issues:
+        labels = ", ".join(key.replace("_", " ") for key in issues)
+        _add_history(
+            req,
+            ISSUES_FOUND,
+            user,
+            f"Review completed with issues found ({labels}): {req.risk_level} risk "
+            f"({risk_score}/100). The requester should visit the Land Registry to resolve them.",
+        )
+    else:
+        _add_history(
+            req,
+            VERIFIED,
+            user,
+            f"Assessment verified: {req.risk_level} risk ({risk_score}/100). Result sent to requester.",
+        )
     db.commit()
 
     # Dispatch Notification (Phase 10)
@@ -1013,7 +1057,7 @@ def verify_and_send(
         buyer_user_id=req.requester_id,
         request_id=req.request_id,
         property_id=req.property_id,
-        status=VERIFIED,
+        status=_api_status(req),
         risk_level=req.risk_level,
     )
 
@@ -1051,8 +1095,8 @@ def reject(db: Session, user: User, request_id: str, reason: str) -> dict[str, A
 def certificate_html(db: Session, user: User, request_id: str) -> tuple[str, str]:
     req = _get_request(db, request_id)
     _ensure_can_view(db, user, req)
-    if req.status != VERIFIED:
-        raise _conflict("A certificate is only available for verified assessments.")
+    if req.status != VERIFIED or _issue_sections(req):
+        raise _conflict("A certificate is only available for fully verified assessments.")
 
     snapshot = req.submitted_snapshot or {}
     reviewer = _user_map(db, {req.reviewer_id or ""}).get(req.reviewer_id or "")

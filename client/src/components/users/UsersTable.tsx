@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { isAxiosError } from "axios";
 import ArrowDownward from "@mui/icons-material/ArrowDownward";
 import ArrowUpward from "@mui/icons-material/ArrowUpward";
@@ -106,10 +107,17 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
   const [levelBusyId, setLevelBusyId] = useState<string | null>(null);
   const [prevRefreshKey, setPrevRefreshKey] = useState(refreshKey);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
+  const searchParam = useSearchParams().get("search")?.trim() ?? "";
+  const [searchInput, setSearchInput] = useState(searchParam);
+  const [search, setSearch] = useState(searchParam);
+  const [syncedSearchParam, setSyncedSearchParam] = useState(searchParam);
   const [sortBy, setSortBy] = useState<SortField>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  if (searchParam !== syncedSearchParam) {
+    setSyncedSearchParam(searchParam);
+    setSearchInput(searchParam);
+  }
 
   if (refreshKey !== prevRefreshKey) {
     setPrevRefreshKey(refreshKey);
@@ -140,9 +148,9 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
         if (isSystem) {
           params.sort_by = sortBy;
           params.sort_dir = sortDir;
-          if (search) {
-            params.q = search;
-          }
+        }
+        if (search) {
+          params.q = search;
         }
         const { data } = await api.get<ManagedUser[]>("/api/v1/users/", {
           params
@@ -297,30 +305,30 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
         aria-label="Users directory"
         className="min-w-0 overflow-hidden rounded-xl border border-border-subtle bg-surface"
       >
-        {isSystem ? (
-          <div className="flex flex-col gap-3 border-b border-border-subtle p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-            <div className="relative w-full sm:max-w-sm">
-              <Icons.Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-text-muted" />
-              <input
-                type="search"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search name, username, ID, email or phone"
-                aria-label="Search users"
-                className="h-10 w-full rounded-lg border border-border-subtle bg-surface py-2 pr-9 pl-9 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-primary"
-              />
-              {searchInput ? (
-                <button
-                  type="button"
-                  onClick={() => setSearchInput("")}
-                  aria-label="Clear search"
-                  className="absolute top-1/2 right-2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-text-muted hover:text-text-primary"
-                >
-                  <Icons.Close className="!h-4 !w-4" />
-                </button>
-              ) : null}
-            </div>
+        <div className="flex flex-col gap-3 border-b border-border-subtle p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+          <div className="relative w-full sm:max-w-sm">
+            <Icons.Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-text-muted" />
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Search name, username, ID, email or phone"
+              aria-label="Search users"
+              className="h-10 w-full rounded-lg border border-border-subtle bg-surface py-2 pr-9 pl-9 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-primary"
+            />
+            {searchInput ? (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                aria-label="Clear search"
+                className="absolute top-1/2 right-2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-text-muted hover:text-text-primary"
+              >
+                <Icons.Close className="!h-4 !w-4" />
+              </button>
+            ) : null}
+          </div>
 
+          {isSystem ? (
             <div className="flex items-center gap-2">
               <label
                 htmlFor="users-sort"
@@ -362,8 +370,8 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
                 )}
               </button>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
 
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse text-left text-sm">
@@ -446,7 +454,7 @@ export function UsersTable({ refreshKey = 0, onChanged }: UsersTableProps) {
                     colSpan={columnCount}
                     className="px-4 py-10 text-center text-sm text-text-muted"
                   >
-                    {isSystem && search
+                    {search
                       ? `No users match "${search}".`
                       : "No users found in the directory."}
                   </td>

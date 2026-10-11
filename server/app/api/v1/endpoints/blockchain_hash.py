@@ -62,8 +62,8 @@ def list_hash_details(
         raise HTTPException(
             status_code=500,
             detail=(
-                "Unable to read hash details. Ensure the view exists "
-                f"(run sql/003_blockchain_hash_details_view.sql): {exc}"
+                "Unable to read hash details. Ensure the "
+                f"core.blockchain_hash_details view exists: {exc}"
             ),
         ) from exc
 

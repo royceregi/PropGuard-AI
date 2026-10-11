@@ -12,10 +12,13 @@ import {
 import {
   displayValue,
   LEVEL_VARIANTS,
+  SECTION_LABELS,
   SIGNAL_VARIANTS,
   STATUS_LABELS,
   STATUS_VARIANTS,
+  VERIFICATION_SECTIONS,
   type HistoryEvent,
+  type VerificationChecks,
   type PropertySnapshot,
   type RiskLevel,
   type RiskRequestStatus,
@@ -31,6 +34,44 @@ export function RequestStatusBadge({ status }: { status: RiskRequestStatus }) {
       variant={STATUS_VARIANTS[status]}
       size="sm"
     />
+  );
+}
+
+export function IssuesFoundNotice({
+  checks,
+  audience
+}: {
+  checks: VerificationChecks;
+  audience: "requester" | "registry";
+}) {
+  const issues = VERIFICATION_SECTIONS.filter(
+    (section) => checks[section] === false
+  );
+  return (
+    <div className="rounded-lg border border-warning/40 bg-warning/10 p-3">
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
+        <Icons.WarningAmber className="h-4 w-4 text-warning" />
+        Issues found by the Land Registry
+      </p>
+      {issues.length > 0 ? (
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {issues.map((section) => (
+            <li key={section}>
+              <StatusBadge
+                label={SECTION_LABELS[section]}
+                variant="error"
+                size="sm"
+              />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <p className="mt-2 text-xs text-text-secondary">
+        {audience === "requester"
+          ? "Please visit the Land Registry office with your property documents to resolve these issues. You can request a new assessment once they are corrected."
+          : "The requester has been asked to visit the Land Registry to resolve these issues."}
+      </p>
+    </div>
   );
 }
 

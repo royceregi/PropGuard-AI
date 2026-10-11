@@ -85,7 +85,7 @@ export const navItems: NavItem[] = [
     href: "/shared-properties",
     label: "Shared Properties",
     badge: null,
-    levels: ["SYSTEM", "REGISTRY", "COMPANY", "PUBLIC"]
+    levels: ["COMPANY", "PUBLIC"]
   },
   {
     id: "users",

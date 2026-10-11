@@ -20,7 +20,7 @@ from app.models.retrieval import QueryLog
 from app.models.risk_assessment import RiskAssessment, TransactionFeature
 
 
-def get_dashboard_analytics(db: Session) -> dict[str, Any]:
+def get_dashboard_analytics(db: Session, *, include_recent_queries: bool = True) -> dict[str, Any]:
     """Summary dashboard metrics computed from core tables."""
 
     total_transactions = db.query(func.count(PropertyTransaction.transaction_id)).scalar() or 0
@@ -32,6 +32,26 @@ def get_dashboard_analytics(db: Session) -> dict[str, Any]:
         .scalar()
         or 0
     )
+
+    ledger_counts = {
+        (status or "UNKNOWN").upper(): int(count)
+        for status, count in db.query(
+            BlockchainTransaction.transaction_status,
+            func.count(BlockchainTransaction.blockchain_tx_id),
+        )
+        .group_by(BlockchainTransaction.transaction_status)
+        .all()
+    }
+    ledger_total = sum(ledger_counts.values())
+    ledger_status = {
+        "confirmed": ledger_counts.get("CONFIRMED", 0),
+        "pending": ledger_counts.get("PENDING", 0),
+        "failed": ledger_counts.get("FAILED", 0),
+        "total": ledger_total,
+        "confirmed_pct": round(ledger_counts.get("CONFIRMED", 0) / ledger_total * 100, 1)
+        if ledger_total
+        else 0.0,
+    }
 
     risk_counts = dict(
         db.query(RiskAssessment.risk_level, func.count(RiskAssessment.assessment_id))
@@ -118,7 +138,11 @@ def get_dashboard_analytics(db: Session) -> dict[str, Any]:
     }
 
     # Recent query logs
-    recent_logs = db.query(QueryLog).order_by(QueryLog.log_timestamp.desc()).limit(5).all()
+    recent_logs = (
+        db.query(QueryLog).order_by(QueryLog.log_timestamp.desc()).limit(5).all()
+        if include_recent_queries
+        else []
+    )
     recent_queries = [
         {
             "query_id": q.query_id,
@@ -142,6 +166,7 @@ def get_dashboard_analytics(db: Session) -> dict[str, Any]:
             "verification_failures": verification_failures,
             "avg_query_latency_ms": avg_latency,
         },
+        "ledger_status": ledger_status,
         "risk_distribution": risk_distribution,
         "transactions_by_month": transactions_by_month,
         "transactions_by_area": transactions_by_area,

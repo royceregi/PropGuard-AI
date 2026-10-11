@@ -11,6 +11,7 @@ import { formatDateTime, propertyHref } from "@/lib/property-search/types";
 import {
   apiErrorMessage,
   displayValue,
+  isCompletedResult,
   levelForScore,
   requesterTypeLabel,
   SECTION_LABELS,
@@ -25,6 +26,7 @@ import { toast } from "@/lib/toast";
 import {
   downloadCertificate,
   HistoryTimeline,
+  IssuesFoundNotice,
   RequestStatusBadge,
   RestrictedState,
   RiskLevelBadge,
@@ -129,18 +131,34 @@ export function RegistryReviewWorkspace({ requestId }: { requestId: string }) {
   const system = workspace.system_checks;
   const editable = request.status === "UNDER_REVIEW";
   const finished =
-    request.status === "VERIFIED" || request.status === "REJECTED";
+    isCompletedResult(request.status) || request.status === "REJECTED";
   const scoreNumber = score.trim() === "" ? null : Number(score);
   const scoreValid =
     scoreNumber != null &&
     Number.isInteger(scoreNumber) &&
     scoreNumber >= 0 &&
     scoreNumber <= 100;
-  const allVerified = VERIFICATION_SECTIONS.every(
-    (section) => checks[section] === true
+  const uncheckedSections = VERIFICATION_SECTIONS.filter(
+    (section) => checks[section] == null
   );
-  const canVerify =
-    editable && allVerified && scoreValid && notes.trim().length > 0;
+  const issueSections = VERIFICATION_SECTIONS.filter(
+    (section) => checks[section] === false
+  );
+  const sendRequirements = [
+    {
+      done: uncheckedSections.length === 0,
+      label:
+        uncheckedSections.length === 0
+          ? "All 4 sections marked Verified or Issue found"
+          : `Mark as Verified or Issue found: ${uncheckedSections
+              .map((section) => SECTION_LABELS[section])
+              .join(", ")}`
+    },
+    { done: scoreValid, label: "Risk score set (whole number 0–100)" },
+    { done: notes.trim().length > 0, label: "Evaluation notes written" }
+  ];
+  const canSend = editable && sendRequirements.every((item) => item.done);
+  const sendsIssues = issueSections.length > 0;
 
   async function run<T>(kind: Busy, action: () => Promise<T>, success: string) {
     setBusy(kind);
@@ -193,7 +211,9 @@ export function RegistryReviewWorkspace({ requestId }: { requestId: string }) {
         });
         applyRequest(data);
       },
-      "Assessment verified and sent to the requester."
+      sendsIssues
+        ? "Result sent to the requester with issues found."
+        : "Assessment verified and sent to the requester."
     );
 
   const reject = () =>
@@ -371,8 +391,14 @@ export function RegistryReviewWorkspace({ requestId }: { requestId: string }) {
             </h3>
             {finished ? (
               <div className="space-y-3">
-                {request.status === "VERIFIED" ? (
+                {isCompletedResult(request.status) ? (
                   <>
+                    {request.status === "ISSUES_FOUND" ? (
+                      <IssuesFoundNotice
+                        checks={request.verification_checks}
+                        audience="registry"
+                      />
+                    ) : null}
                     <RiskLevelBadge
                       level={request.risk_level}
                       score={request.risk_score}
@@ -391,16 +417,18 @@ export function RegistryReviewWorkspace({ requestId }: { requestId: string }) {
                         Result fingerprint: {request.result_hash}
                       </p>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void downloadCertificate(request.request_id)
-                      }
-                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text-primary hover:bg-surface-subtle"
-                    >
-                      <Icons.FileDownload className="h-4 w-4" />
-                      Download certificate
-                    </button>
+                    {request.can_download_certificate ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void downloadCertificate(request.request_id)
+                        }
+                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text-primary hover:bg-surface-subtle"
+                      >
+                        <Icons.FileDownload className="h-4 w-4" />
+                        Download certificate
+                      </button>
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -481,11 +509,42 @@ export function RegistryReviewWorkspace({ requestId }: { requestId: string }) {
                   />
                 </label>
 
-                {editable && !allVerified ? (
-                  <p className="text-xs text-text-muted">
-                    Mark every property section as verified to send the result.
-                    If information is incorrect, reject the request instead.
-                  </p>
+                {editable ? (
+                  <div className="space-y-2 rounded-lg border border-border-subtle bg-surface-subtle/60 p-3">
+                    <p className="text-xs font-semibold text-text-primary">
+                      {canSend
+                        ? "Ready to send."
+                        : "To enable the send button:"}
+                    </p>
+                    <ul className="space-y-1">
+                      {sendRequirements.map((item) => (
+                        <li
+                          key={item.label}
+                          className={`flex items-start gap-1.5 text-xs ${
+                            item.done ? "text-success-hover" : "text-text-muted"
+                          }`}
+                        >
+                          {item.done ? (
+                            <Icons.Check className="mt-px h-3.5 w-3.5 shrink-0" />
+                          ) : (
+                            <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
+                          )}
+                          {item.label}
+                        </li>
+                      ))}
+                    </ul>
+                    {sendsIssues ? (
+                      <p className="text-xs text-text-secondary">
+                        Issues found in{" "}
+                        {issueSections
+                          .map((section) => SECTION_LABELS[section])
+                          .join(", ")}
+                        . The result will be sent as{" "}
+                        <span className="font-semibold">Issues found</span> and
+                        the requester will be asked to visit the Land Registry.
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
 
                 {editable ? (
@@ -509,13 +568,15 @@ export function RegistryReviewWorkspace({ requestId }: { requestId: string }) {
                     <button
                       type="button"
                       onClick={() => void verifyAndSend()}
-                      disabled={busy !== null || !canVerify}
+                      disabled={busy !== null || !canSend}
                       className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-text-inverse hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <Icons.Send className="h-4 w-4" />
                       {busy === "verify"
                         ? "Sending…"
-                        : "Verify & Send Assessment Result to User"}
+                        : sendsIssues
+                          ? "Send Result with Issues to User"
+                          : "Verify & Send Assessment Result to User"}
                     </button>
                   </div>
                 ) : null}

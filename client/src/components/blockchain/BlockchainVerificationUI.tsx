@@ -29,8 +29,6 @@ import {
   Scale,
   ShieldX
 } from "lucide-react";
-import Link from "next/link";
-import { useAuth } from "@/hooks/useAuth";
 import { JetBrains_Mono } from "next/font/google";
 import { useSearchParams } from "next/navigation";
 import {
@@ -73,33 +71,7 @@ function apiErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-function RestrictedAccessMessage() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-8 bg-surface rounded-2xl border border-border shadow-sm">
-      <div className="h-16 w-16 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 mb-4">
-        <ShieldX className="h-8 w-8" />
-      </div>
-      <h2 className="text-xl font-bold text-text-primary mb-2">
-        Blockchain Verification Access Restricted
-      </h2>
-      <p className="text-sm text-text-muted max-w-md mb-6">
-        Direct cryptographic blockchain verification and ledger console access
-        is restricted to Official Land Registrars, System Administrators, and
-        Real Estate Companies. Public property owners can inspect their verified
-        property records and request risk assessments via My Properties.
-      </p>
-      <Link
-        href="/dashboard/my-properties"
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-text-inverse font-medium text-sm hover:bg-primary-hover transition-colors"
-      >
-        Return to My Properties
-      </Link>
-    </div>
-  );
-}
-
 export function BlockchainVerificationUI() {
-  const { user } = useAuth();
   const searchParams = useSearchParams();
 
   const [form, setForm] = useState<VerificationForm>(() => ({
@@ -130,10 +102,6 @@ export function BlockchainVerificationUI() {
       cancelled = true;
     };
   }, []);
-
-  if (user?.access_level === "PUBLIC") {
-    return <RestrictedAccessMessage />;
-  }
 
   function updateField(key: VerificationFieldKey, value: string) {
     setForm((current) => ({ ...current, [key]: value }));

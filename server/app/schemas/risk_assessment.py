@@ -5,7 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-RequestStatus = Literal["SUBMITTED", "UNDER_REVIEW", "VERIFIED", "REJECTED"]
+# ISSUES_FOUND is stored as VERIFIED with at least one section marked as an issue.
+RequestStatus = Literal["SUBMITTED", "UNDER_REVIEW", "VERIFIED", "ISSUES_FOUND", "REJECTED"]
 RiskLevel = Literal["LOW", "MEDIUM", "HIGH"]
 AccessType = Literal["OWNER", "SHARED"]
 SignalStatus = Literal["PASS", "WARN", "FAIL", "INFO"]
